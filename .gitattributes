@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+*.glb binary
+*.gltf text
+*.bin binary
+*.png binary
+*.jpg binary
+*.ktx2 binary
+*.ogg binary
+*.opus binary
+*.wav binary
+*.blend binary

@@ -174,7 +174,7 @@ Gamepads use the Gamepad API's standard mapping. We also need to handle hot-plug
 - **PBR textures:** 2K for the helicopter and 1K for props. Compress them to KTX2.
 
 **Workflow**
-1. **Download** the asset from Sketchfab as glTF. **Record the license** in `assets/CREDITS.md`, since CC-BY requires attribution. Avoid "Editorial" or NoAI-restricted licenses for shipped content.
+1. **Download** the asset from Sketchfab as glTF. **Record the license** in `CREDITS.md`, since CC-BY requires attribution. Avoid "Editorial" or NoAI-restricted licenses for shipped content.
 2. **Clean up in Blender:** apply transforms, set the scale, fix pivots, add the named empties, and build `COL_*` proxies. Split animated parts (rotors, doors, gun barrels) into separate nodes.
 3. **Export a GLB** to `assets/source/`.
 4. **Optimise:** run `npm run assets` (`tools/optimize.ts`, using gltf-transform: dedup, prune, meshopt, KTX2) and write the result to `assets/models/`.
@@ -182,12 +182,18 @@ Gamepads use the Gamepad API's standard mapping. We also need to handle hot-plug
 
 The Blender MCP connection is available in this environment, so I can help with checking scenes, naming nodes and exporting directly from Blender.
 
-**Helicopter model: to be chosen.** The first candidate (Hitoshi Matsui's MH-6) was rejected because of its Editorial license and missing cockpit. When choosing the next one, check:
-- The license allows use in a game (CC-BY, CC0, or Sketchfab Standard).
-- It has a cockpit interior, or we budget time to model one.
-- The rotors are separate objects or bones.
+**Helicopter model: "Helicopters MH-6 Little Bird" by mario low poly**
+Link: [sketchfab.com/…/69cb05db3fc3483cb729734262abf28e](https://sketchfab.com/3d-models/helicopters-mh-6-little-bird-69cb05db3fc3483cb729734262abf28e)
 
-Until then, `vehicles/PlaceholderHeli.ts` is a primitive stand-in that follows the same conventions.
+| Item | Details |
+|---|---|
+| License | **CC Attribution 4.0**. It's free to download, and any use (including commercial) is allowed with credit. The game is non-commercial anyway. **Credit required:** "Helicopters MH-6 Little Bird" by mario low poly (sketchfab.com/mariogpymario117), CC BY 4.0. This goes in `CREDITS.md` and the in-game credits. |
+| Geometry | About 27k triangles, 9 materials, 1 texture. That fits the 30–60k budget for the most detailed version. |
+| Animations | None, which is fine because the rotors are driven from code. |
+| To check after download (in Blender) | Whether the cockpit has an interior. Whether the rotors are separate objects. Whether it includes the MH-6 troop benches or the AH-6 weapon pods. Its scale and pivots. |
+| Expected work in Blender | Split out and re-pivot the rotors, add the named attachment points (eye point, seats, muzzles, skids, collision shapes), and model the missing parts. |
+
+`vehicles/PlaceholderHeli.ts` stays as the stand-in until this model reaches M3. The download stays out of git under `assets/source/`. Only the optimised GLB in `public/models/` gets committed.
 
 **Asset list for the MVP**
 - Little Bird: exterior, cockpit interior, MH-6 benches, AH-6 weapon pods.
@@ -233,7 +239,7 @@ A real helicopter's rotor speed barely changes, because it is governed. What you
 - **Impacts:** different sounds per surface (dirt, metal, wood). Bullets hitting the helicopter make a distinct metallic ping, which tells the player they're under fire.
 
 ### 8.4 Sources and format
-- Libraries: the Sonniss GDC bundles (free and royalty-free), BOOM Library and Pro Sound Effects (paid, high quality), and Freesound (check each license). Record any attribution in `assets/CREDITS.md`.
+- Libraries: the Sonniss GDC bundles (free and royalty-free), BOOM Library and Pro Sound Effects (paid, high quality), and Freesound (check each license). Record any attribution in `CREDITS.md`.
 - Keep the 48 kHz WAV masters in `assets/audio/source/`. Ship **Opus/OGG** files, encoded by an `npm run audio` script.
 - Edit the loops for seamless zero-crossing loop points before export.
 
