@@ -29,6 +29,8 @@ export class MissionDirector {
   missionIndex = 0
   /** Set by the game to put the helicopter back on the pad when retrying after a crash. */
   onRetry?: () => void
+  /** Called when a mission is completed, with its final score. */
+  onComplete?: (missionId: string, score: number, index: number) => void
 
   private readonly hud: MissionHud
   private readonly chimes: { up: AudioBuffer; good: AudioBuffer; bad: AudioBuffer }
@@ -192,6 +194,7 @@ export class MissionDirector {
         case 'complete': {
           const kills = this.combat.enemies.kills
           if (kills > 0) this.runner.score.push({ label: `Enemies neutralised ×${kills}`, points: kills * 20 })
+          this.onComplete?.(this.runner.mission!.id, this.runner.totalScore, this.missionIndex)
           this.play('good')
           break
         }

@@ -4,7 +4,17 @@ import { loadKeyboardLayout } from './input/labels'
 import { loadRapier } from './physics/Physics'
 import { GltfHeliModel } from './vehicles/GltfHeliModel'
 
+const loading = document.getElementById('loading')!
+const status = loading.querySelector('.status')!
+
+/** Shows a loading step and lets the browser paint it before the next (blocking) step runs. */
+async function step(text: string): Promise<void> {
+  status.textContent = text
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+}
+
 async function boot(): Promise<void> {
+  await step('Loading physics, model and settings…')
   const [settings, keyboardLayout, rapier, heliModel] = await Promise.all([
     SettingsStore.load(),
     loadKeyboardLayout(),
@@ -15,6 +25,8 @@ async function boot(): Promise<void> {
       return undefined
     }),
   ])
+
+  await step('Generating the valley…')
   const game = new Game(
     document.getElementById('viewport')!,
     document.getElementById('hud')!,
@@ -31,7 +43,11 @@ async function boot(): Promise<void> {
     }
   })
 
+  await step('Compiling shaders…')
   game.start()
+  await new Promise((r) => setTimeout(r, 300))
+  loading.classList.add('done')
+  setTimeout(() => loading.remove(), 600)
 
   // Handy for poking at the scene from DevTools during development.
   if (import.meta.env.DEV) Object.assign(window, { game })
@@ -39,5 +55,5 @@ async function boot(): Promise<void> {
 
 boot().catch((err) => {
   console.error(err)
-  document.body.textContent = `Failed to start: ${err instanceof Error ? err.message : String(err)}`
+  status.textContent = `Failed to start: ${err instanceof Error ? err.message : String(err)}`
 })

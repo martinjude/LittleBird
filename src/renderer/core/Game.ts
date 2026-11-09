@@ -16,6 +16,7 @@ import { InputOverlay } from '../ui/InputOverlay'
 import { MissionDirector } from '../missions/MissionDirector'
 import { Combat } from '../combat/Combat'
 import { WeaponHud } from '../ui/WeaponHud'
+import { Menu } from '../ui/Menu'
 import { MISSIONS } from '../missions/missions'
 import { TROOP_MASS } from '../troops/TroopSquad'
 import { keyLabel, padButtonLabel } from '../input/labels'
@@ -54,6 +55,9 @@ export class Game {
   private readonly aimPoint = new Vector3()
   private readonly aimDir = new Vector3()
   private readonly aimRay: InstanceType<Rapier['Ray']>
+  private readonly menu: Menu
+  private readonly keyboardMouse: BrowserKeyboardMouseSource
+  private shadowsApplied: boolean
   private readonly attitude = { pitch: 0, roll: 0, heading: 0 }
   private audioPaused = false
 
@@ -76,6 +80,7 @@ export class Game {
 
     this.camera = new PerspectiveCamera(gfx.fov, 1, 0.2, 20000)
     this.world = new ValleyWorld(this.renderer, this.camera)
+    this.world.treeDistance = gfx.treeDistance
     this.physics = new Physics(rapier, 1 / SIM_HZ)
     this.world.createColliders(this.physics)
     this.world.scene.add(this.physics.debugLines)
@@ -92,9 +97,10 @@ export class Game {
     if (this.heli.model.eye) this.cameras.eye.copy(this.heli.model.eye)
 
     const { controls, bindings } = settings.value
-    const keyboardMouse = new BrowserKeyboardMouseSource(this.renderer.domElement)
+    const keyboardMouse = (this.keyboardMouse = new BrowserKeyboardMouseSource(this.renderer.domElement))
     keyboardMouse.setPointerLockButtons(bindings.keyboard.buttons.freeLook)
     this.input = new InputSystem(keyboardMouse, new BrowserGamepadSource(), controls, bindings)
+    this.shadowsApplied = gfx.shadows
     this.hud = new Hud(hudRoot, bindings, keyboardLayout)
     this.flightHud = new FlightHud(hudRoot)
     this.inputOverlay = new InputOverlay(hudRoot)
@@ -103,6 +109,38 @@ export class Game {
     this.aimRay = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })
     this.missions = new MissionDirector(this.world, this.heli, this.audio, this.combat, hudRoot)
     this.missions.onRetry = () => this.respawn(false)
+    this.missions.onComplete = (id, score, index) => {
+      const progress = this.settings.value.progress
+      progress.best[id] = Math.max(progress.best[id] ?? 0, score)
+      progress.current = (index + 1) % MISSIONS.length
+      this.settings.changed()
+    }
+    this.missions.start(settings.value.progress.current)
+
+    this.menu = new Menu(hudRoot, settings, {
+      resume: () => this.closeMenu(),
+      startMission: (i) => {
+        this.respawn(false)
+        this.missions.start(i)
+        this.settings.value.progress.current = i
+        this.settings.changed()
+        this.closeMenu()
+      },
+      restartMission: () => {
+        this.respawn()
+        this.closeMenu()
+      },
+      quit: () => window.littlebird?.app.quit(),
+      settingsChanged: () => this.applySettings(),
+      bindingsChanged: () => {
+        // Bindings are edited in place, but the input layer caches some of them.
+        this.input.bindings = this.settings.value.bindings
+        this.keyboardMouse.setPointerLockButtons(this.settings.value.bindings.keyboard.buttons.freeLook)
+        this.hud.invalidate()
+      },
+      inMission: () => this.missions.runner.phase !== 'briefing',
+      siteName: (id) => this.world.map.sites.find((s) => s.id === id)?.name ?? id,
+    }, keyboardLayout)
 
     this.loop = new GameLoop(
       {
@@ -115,6 +153,7 @@ export class Game {
 
     new ResizeObserver(() => this.resize()).observe(host)
     this.resize()
+    this.openMenu()
 
     this.debug = new Debug(this.renderer)
     this.buildDebugUi()
@@ -142,9 +181,43 @@ export class Game {
   private pollInput(dt: number): void {
     this.input.update(dt)
     const b = this.input.state.buttons
-    if (b.pause.pressed) this.loop.paused = !this.loop.paused
+    if (this.menu.isOpen) {
+      if (b.pause.pressed) this.menu.back()
+      this.menu.update(this.input.state)
+      return
+    }
+    if (b.pause.pressed) this.openMenu()
     if (b.reset.pressed) this.respawn()
     if (b.toggleCamera.pressed) this.cameras.toggleView()
+  }
+
+  private openMenu(): void {
+    this.menu.open('main')
+    this.loop.paused = true
+  }
+
+  private closeMenu(): void {
+    this.menu.close()
+    this.loop.paused = false
+  }
+
+  /** Re-applies graphics, audio and view settings after they change in the menu. */
+  private applySettings(): void {
+    const gfx = this.settings.value.graphics
+    this.camera.fov = gfx.fov
+    this.camera.updateProjectionMatrix()
+    this.world.treeDistance = gfx.treeDistance
+    this.resize()
+    this.audio.applyVolumes(this.settings.value.audio)
+    if (gfx.shadows !== this.shadowsApplied) {
+      this.shadowsApplied = gfx.shadows
+      this.renderer.shadowMap.enabled = gfx.shadows
+      // Materials compile shadow support into their shaders, so they need a rebuild.
+      this.world.scene.traverse((o) => {
+        const material = (o as Mesh).material as Material | Material[] | undefined
+        for (const m of [material ?? []].flat()) m.needsUpdate = true
+      })
+    }
   }
 
   private fixedUpdate(): void {
@@ -168,7 +241,7 @@ export class Game {
 
     this.missions.update(
       simDt,
-      s.buttons.interact.pressed,
+      s.buttons.interact.pressed && !this.menu.isOpen,
       this.interactLabel(),
       this.camera,
       this.host.clientWidth,
@@ -180,7 +253,7 @@ export class Game {
       this.combat.update(simDt, { guns: b.fireGuns.down, rockets: b.fireRockets.down, rocketsPressed: b.fireRockets.pressed }, this.wind)
     }
     this.updateAudio(dt)
-    this.world.update()
+    this.world.update(this.camera)
     this.physics.updateDebug()
     this.renderer.render(this.world.scene, this.camera)
 

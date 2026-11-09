@@ -368,7 +368,21 @@ Each milestone ends with something you can play or test.
 | **M5** ✅ | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
 | **M6** ✅ | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
 | **M7** ✅ | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |
-| **M8** | **MVP polish** | Menus, rebinding UI, settings persistence, loading screen, performance pass (LODs, culling, KTX2) and an electron-builder package. |
+| **M8** ✅ | **MVP polish** | Menus, rebinding UI, settings persistence, loading screen, performance pass (LODs, culling, KTX2) and an electron-builder package. |
+
+
+**M8 as built: MVP polish**
+- **Menu** (`ui/Menu.ts`), opened with Esc / Menu:
+  - Main/pause menu: Fly/Resume, Restart, Missions, Settings, Controls, Quit.
+  - Missions shows each route, troop count, a HOSTILE tag and the saved best score.
+  - Settings covers assist, gamepad collective mode, FOV, render scale, tree distance, shadows, five volume sliders, deadzone, mouse look and invert.
+  - Controls rebinds keyboard keys, mouse buttons, gamepad buttons and stick axes (with automatic invert detection), and has a reset to defaults.
+  - Works with mouse, keyboard (Tab/Enter, Esc = back) and gamepad (D-pad, A, B; left/right adjusts sliders).
+- **Persistence:** settings, bindings, best scores and the next mission are saved in `userData/settings.json`. Saved open maps such as best scores survive merging with defaults (tested).
+- **Loading screen** with step messages, painted between the blocking steps.
+- **Performance:** trees and rocks are split into 512 m chunks, so each chunk can be frustum-culled. The tree draw distance is a setting, and only trees within 700 m cast shadows. That cut triangles per frame from 9.0M to 5.0M, and frame rate went from about 100 to 120 fps, the vsync cap.
+- **Packaging:** `npm run dist` builds `release/LittleBird Setup 0.1.0.exe` (NSIS, 123 MB) and a portable `LittleBird 0.1.0.exe` (112 MB). Vite bundles three, Rapier, lil-gui and stats-gl into the renderer, so the package ships no `node_modules`. A smoke test launched the packaged app over CDP: it booted to the menu with no errors and loaded the GLB.
+- Not done yet: an app icon, code signing, KTX2 textures (unnecessary so far, since the textures are tiny), tree impostors, and an auto-update channel.
 
 Performance target: **60 fps at 1080p on a mid-range GPU**, for example GTX 1660 or RX 6600 class.
 

@@ -23,9 +23,19 @@ const { smoothstep } = MathUtils
 const CANDIDATE_SPACING = 11
 const MAX_TREES = 18000
 const MAX_ROCKS = 2500
+/** Instances are grouped into square chunks so the renderer can cull and distance-limit them. */
+const CHUNK_SIZE = 512
+
+/** One chunk's instanced meshes (one per species that has instances in it). */
+export interface VegetationChunk {
+  center: Vector3
+  /** Horizontal half-diagonal, for distance tests from the chunk edge. */
+  radius: number
+  meshes: InstancedMesh[]
+}
 
 export interface Vegetation {
-  meshes: InstancedMesh[]
+  chunks: VegetationChunk[]
   colliders: StaticCollider[]
 }
 
@@ -127,24 +137,43 @@ export function scatterVegetation(map: ValleyMap, seed: number): Vegetation {
     rockColors.push(new Color().setHSL(0.08, 0.06, 0.28 + rand() * 0.14))
   }
 
-  const instanced = (geometry: BufferGeometry, matrices: Matrix4[], colors: Color[], name: string, vertexColors: boolean) => {
-    const mesh = new InstancedMesh(geometry, new MeshStandardMaterial({ vertexColors, roughness: 0.9 }), matrices.length)
-    matrices.forEach((mat, i) => {
-      mesh.setMatrixAt(i, mat)
-      mesh.setColorAt(i, colors[i])
+  // Bucket every species by chunk; geometry and material are shared across chunks.
+  const chunkCount = Math.ceil(hm.size / CHUNK_SIZE)
+  const chunks: VegetationChunk[] = []
+  for (let cz = 0; cz < chunkCount; cz++) {
+    for (let cx = 0; cx < chunkCount; cx++) {
+      const center = new Vector3(-hm.half + (cx + 0.5) * CHUNK_SIZE, 0, -hm.half + (cz + 0.5) * CHUNK_SIZE)
+      center.y = hm.heightAt(center.x, center.z)
+      chunks.push({ center, radius: CHUNK_SIZE * Math.SQRT1_2, meshes: [] })
+    }
+  }
+  const chunkOf = (m: Matrix4) => {
+    const x = m.elements[12]
+    const z = m.elements[14]
+    const cx = MathUtils.clamp(Math.floor((x + hm.half) / CHUNK_SIZE), 0, chunkCount - 1)
+    const cz = MathUtils.clamp(Math.floor((z + hm.half) / CHUNK_SIZE), 0, chunkCount - 1)
+    return cz * chunkCount + cx
+  }
+  const species = (geometry: BufferGeometry, matrices: Matrix4[], colors: Color[], name: string, vertexColors: boolean) => {
+    const material = new MeshStandardMaterial({ vertexColors, roughness: 0.9 })
+    const buckets = chunks.map(() => [] as number[])
+    matrices.forEach((m, i) => buckets[chunkOf(m)].push(i))
+    buckets.forEach((indices, c) => {
+      if (!indices.length) return
+      const mesh = new InstancedMesh(geometry, material, indices.length)
+      indices.forEach((src, i) => {
+        mesh.setMatrixAt(i, matrices[src])
+        mesh.setColorAt(i, colors[src])
+      })
+      mesh.castShadow = mesh.receiveShadow = true
+      mesh.computeBoundingSphere()
+      mesh.name = `${name} ${c}`
+      chunks[c].meshes.push(mesh)
     })
-    mesh.castShadow = mesh.receiveShadow = true
-    mesh.computeBoundingSphere()
-    mesh.name = name
-    return mesh
   }
+  species(coniferGeometry(), conifers, coniferColors, 'Conifers', true)
+  species(broadleafGeometry(), broadleaves, broadleafColors, 'Broadleaves', true)
+  species(new IcosahedronGeometry(1, 0), rocks, rockColors, 'Rocks', false)
 
-  return {
-    meshes: [
-      instanced(coniferGeometry(), conifers, coniferColors, 'Conifers', true),
-      instanced(broadleafGeometry(), broadleaves, broadleafColors, 'Broadleaves', true),
-      instanced(new IcosahedronGeometry(1, 0), rocks, rockColors, 'Rocks', false),
-    ],
-    colliders,
-  }
+  return { chunks: chunks.filter((c) => c.meshes.length), colliders }
 }

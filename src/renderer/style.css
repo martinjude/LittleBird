@@ -488,3 +488,232 @@ body {
   pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 45%, rgb(200 20 10 / 0.9) 100%);
 }
+
+/* --- Menu ---------------------------------------------------------------- */
+
+.menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at 30% 40%, rgb(10 20 14 / 0.55), rgb(4 8 6 / 0.85));
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.menu-panel {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 26px 28px;
+  border-radius: 10px;
+  background: rgb(12 18 14 / 0.99);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.6);
+  color: #e8f3ea;
+}
+
+.menu-title {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.menu-subtitle,
+.menu-hint {
+  margin: 4px 0 20px;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.menu-heading {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.menu-button {
+  padding: 10px 14px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-button:hover,
+.menu-button:focus-visible,
+.menu-button:focus {
+  outline: none;
+  border-color: #9ff0a8;
+  background: rgb(159 240 168 / 0.12);
+}
+
+.menu-button.primary {
+  background: #2f6b3a;
+  border-color: #4f9a5c;
+  font-weight: 700;
+}
+
+.menu-button.back {
+  margin-top: 16px;
+}
+
+.menu-button.mission {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+}
+
+.mm-name {
+  font-weight: 700;
+}
+
+.mm-route {
+  grid-column: 1;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.mm-best {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  font: 13px ui-monospace, Consolas, monospace;
+  color: #9ff0a8;
+}
+
+.menu-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mf-section {
+  margin-top: 12px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.mf-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 70px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.mf-row select {
+  grid-column: 2 / span 2;
+  padding: 5px;
+  border-radius: 4px;
+  background: #1b231d;
+  color: inherit;
+  border: 1px solid rgb(255 255 255 / 0.15);
+}
+
+.mf-row input[type='checkbox'] {
+  justify-self: start;
+  width: 18px;
+  height: 18px;
+}
+
+.mf-row :focus {
+  outline: 2px solid #9ff0a8;
+}
+
+.mf-value {
+  font: 12px ui-monospace, Consolas, monospace;
+  text-align: right;
+  opacity: 0.8;
+}
+
+.menu-bindings {
+  display: grid;
+  grid-template-columns: 1fr 130px 150px;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.menu-button.binding {
+  padding: 5px 8px;
+  text-align: center;
+  font: 12px ui-monospace, Consolas, monospace;
+}
+
+.menu-button.binding.capturing {
+  border-color: #ffd257;
+  color: #ffd257;
+}
+
+.mb-shared {
+  font-size: 11px;
+  text-align: center;
+  opacity: 0.4;
+}
+
+@media (max-width: 520px) {
+  .mf-row {
+    grid-template-columns: 100px 1fr 56px;
+  }
+  .menu-bindings {
+    grid-template-columns: 1fr 96px 110px;
+  }
+}
+
+/* --- Loading screen ------------------------------------------------------- */
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0a0f0c;
+  color: #e8f3ea;
+  z-index: 100;
+  transition: opacity 0.5s;
+}
+
+#loading .title {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+#loading .status {
+  font: 13px ui-monospace, Consolas, monospace;
+  opacity: 0.7;
+}
+
+#loading.done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.menu input,
+.menu select {
+  accent-color: #5fae6c;
+}

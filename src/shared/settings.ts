@@ -37,6 +37,8 @@ export interface Settings {
     /** Upper bound for devicePixelRatio; lower it to trade sharpness for speed. */
     pixelRatioCap: number
     shadows: boolean
+    /** Trees beyond this distance (m) aren't drawn. */
+    treeDistance: number
   }
   audio: {
     master: number
@@ -47,11 +49,17 @@ export interface Settings {
   }
   controls: ControlsSettings
   bindings: Bindings
+  progress: {
+    /** Best score per mission id. */
+    best: Record<string, number>
+    /** Index of the mission to continue with. */
+    current: number
+  }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
-  graphics: { fov: 70, pixelRatioCap: 2, shadows: true },
+  graphics: { fov: 70, pixelRatioCap: 2, shadows: true, treeDistance: 2500 },
   audio: { master: 0.8, vehicle: 1, weapons: 1, world: 1, ui: 0.7 },
   controls: {
     assist: 'standard',
@@ -71,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
     invertLookY: false,
   },
   bindings: DEFAULT_BINDINGS,
+  progress: { best: {}, current: 0 },
 }
 
 /** Deep-merges a (possibly partial or outdated) saved settings object over the defaults. */
@@ -83,7 +92,10 @@ function mergeInto(target: Record<string, unknown>, source: unknown): Record<str
   for (const key of Object.keys(target)) {
     const t = target[key]
     const s = source[key]
-    if (isRecord(t)) mergeInto(t, s)
+    // An empty record in the defaults is an open map (e.g. best scores): take the saved entries as-is.
+    if (isRecord(t) && Object.keys(t).length === 0) {
+      if (isRecord(s)) target[key] = structuredClone(s)
+    } else if (isRecord(t)) mergeInto(t, s)
     else if (s !== undefined && typeof s === typeof t) target[key] = s
   }
   return target

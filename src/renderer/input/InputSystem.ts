@@ -56,7 +56,7 @@ export class InputSystem {
     private readonly keyboard: KeyboardMouseSource,
     private readonly gamepad: GamepadSource,
     private readonly controls: ControlsSettings,
-    private readonly bindings: Bindings,
+    public bindings: Bindings,
   ) {}
 
   /** Call once per rendered frame, before the simulation steps. */

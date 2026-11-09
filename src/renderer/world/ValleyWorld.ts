@@ -18,13 +18,15 @@ import type { StaticCollider } from './colliders'
 import { buildBase, buildLzMarker } from './props'
 import { buildDistantRing, buildTerrain, createGroundMaterial } from './terrainMesh'
 import { generateValley, type Site, type ValleyMap } from './valley'
-import { scatterVegetation } from './vegetation'
+import { scatterVegetation, type VegetationChunk } from './vegetation'
 
 const SEED = 7
 const HAZE_COLOR = 0xbfd0df
 /** Low-res collider for the mountains beyond the playable square (so you can't fly into them). */
 const RING_COLLIDER_EXTENT = 16384
 const RING_COLLIDER_SEGMENTS = 128
+/** Trees further than this don't cast shadows (the far cascade can't resolve them anyway). */
+const TREE_SHADOW_DISTANCE = 700
 
 /**
  * The M5 map: a 4×4 km temperate mountain valley with FOB Eagle, four landing zones,
@@ -40,6 +42,9 @@ export class ValleyWorld {
   readonly spawn: { position: Vector3; heading: number }
 
   private readonly colliders: StaticCollider[] = []
+  private readonly vegetation: VegetationChunk[]
+  /** Trees beyond this (m) aren't drawn; set from the graphics settings. */
+  treeDistance = 2500
   private readonly sunDirection = new Vector3()
 
   constructor(renderer: WebGLRenderer, camera: Camera) {
@@ -77,7 +82,8 @@ export class ValleyWorld {
     this.scene.add(buildTerrain(this.map, ground, SEED), buildDistantRing(this.map, ground, SEED))
 
     const vegetation = scatterVegetation(this.map, SEED)
-    this.scene.add(...vegetation.meshes)
+    this.vegetation = vegetation.chunks
+    for (const chunk of vegetation.chunks) this.scene.add(...chunk.meshes)
     this.colliders.push(...vegetation.colliders)
 
     const base = buildBase(this.base, SEED)
@@ -102,8 +108,19 @@ export class ValleyWorld {
   }
 
   /** Call every frame after the camera has moved. */
-  update(): void {
+  update(camera: Camera): void {
     this.csm.update()
+    // Distance-limit vegetation chunks; only nearby ones cast shadows.
+    const eye = camera.position
+    for (const chunk of this.vegetation) {
+      const d = Math.max(0, Math.hypot(eye.x - chunk.center.x, eye.z - chunk.center.z) - chunk.radius)
+      const visible = d < this.treeDistance
+      const shadow = d < TREE_SHADOW_DISTANCE
+      for (const mesh of chunk.meshes) {
+        mesh.visible = visible
+        mesh.castShadow = shadow
+      }
+    }
   }
 
   /** Call when the camera's projection changes (resize, FOV, near plane). */

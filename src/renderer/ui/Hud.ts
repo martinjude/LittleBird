@@ -18,12 +18,17 @@ export class Hud {
     root.appendChild(this.banner)
   }
 
+  /** Rebuild the hint (e.g. after rebinding). */
+  invalidate(): void {
+    this.shown = ''
+  }
+
   update(input: InputState): void {
     const padType = input.device === 'gamepad' ? (input.pad?.type ?? 'generic') : null
     const key = padType ?? 'keyboard'
     if (key === this.shown) return
     this.shown = key
-    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M7 combat<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
+    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · v${__APP_VERSION__}<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
   }
 
   private keyboardHint(): string {
