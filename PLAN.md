@@ -318,12 +318,37 @@ Each milestone ends with something you can play or test.
 | **M2** ✅ | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
 | **M3** ✅ | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
 | **M4** ✅ | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
-| **M5** | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
+| **M5** ✅ | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
 | **M6** | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
 | **M7** | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |
 | **M8** | **MVP polish** | Menus, rebinding UI, settings persistence, loading screen, performance pass (LODs, culling, KTX2) and an electron-builder package. |
 
 Performance target: **60 fps at 1080p on a mid-range GPU**, for example GTX 1660 or RX 6600 class.
+
+
+**M5 as built: Valley map** (temperate mountains, procedural, seed 7)
+- `world/valley.ts` generates a 4096 m × 4096 m heightmap (513², 8 m spacing) in about 260 ms:
+  - a meandering creek on a rolling valley floor
+  - ridged mountains on both flanks, up to about 850 m, with snow above about 560 m
+  - a rim that closes the valley at the map edge
+- Sites are flattened into the terrain:
+
+  | Site | Altitude | Terrain |
+  |---|---|---|
+  | FOB Eagle | 44 m | valley floor, south |
+  | LZ Alpha | 43 m | valley floor, north |
+  | LZ Bravo | 152 m | hill shoulder |
+  | LZ Charlie | 504 m | mountain |
+  | LZ Delta | 46 m | valley floor, centre (for the later hostile area) |
+- Terrain mesh:
+  - vertex colours for grass, creek dirt, rock on slopes, snow and pad gravel, multiplied by a tiling detail texture
+  - a skirt around the border, plus a low-poly "distant mountains" ring out to 16 km
+- Physics: a Rapier heightfield for the playable square, checked against the visual mesh with raycasts. A coarse heightfield covers the distant ring, so you can't fly through it.
+- About 17k instanced trees (conifers higher up, broadleaf in the valley), each with a cylinder collider, plus 2.5k boulders without colliders.
+- FOB Eagle: three pads, a hangar, tents, containers, a windsock and a HESCO ring with a road gap. LZs are marked with orange VS-17 panels.
+- Cascaded shadow maps (3 cascades, 2.5 km). The HUD shows a "LEAVING AREA" warning near the map edge.
+- Performance: about 100 fps on the dev machine, with about 9M triangles per frame. Trees are drawn in the main pass and in each of the three shadow cascades, so tree LODs or impostors and per-cascade culling are M8 work.
+- Not done yet: water in the creek, roads, grass and ground clutter, and a hand-made map in Blender or Gaea.
 
 ---
 
@@ -343,5 +368,5 @@ Performance target: **60 fps at 1080p on a mid-range GPU**, for example GTX 1660
 Each has a recommended default.
 1. **Realism level:** authentic-arcade with assist modes (recommended), versus hardcore sim.
 2. **Language:** TypeScript (recommended) versus plain JS.
-3. **Map setting/biome:** for example arid desert valley or temperate mountains. This drives the asset shopping list.
+3. ~~**Map setting/biome:**~~ Decided in M5: temperate mountain valley.
 4. **Weapon control on the AH-6:** pilot-fired fixed weapons (true to the AH-6, recommended), versus adding AI door gunners on the MH-6 later.

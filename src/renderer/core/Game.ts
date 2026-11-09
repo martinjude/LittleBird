@@ -15,18 +15,18 @@ import { Hud } from '../ui/Hud'
 import { InputOverlay } from '../ui/InputOverlay'
 import type { HeliModel } from '../vehicles/HeliModel'
 import { Helicopter } from '../vehicles/Helicopter'
-import { TestScene } from '../world/TestScene'
+import { ValleyWorld } from '../world/ValleyWorld'
 import { GameLoop } from './GameLoop'
 import type { SettingsStore } from './SettingsStore'
 
 const SIM_HZ = 120
-const SPAWN = new Vector3(0, 0.05, 0)
-const SPAWN_HEADING = 0
+/** Distance from the map edge at which the HUD warns you're leaving the area. */
+const EDGE_WARNING = 150
 
 export class Game {
   readonly renderer: WebGLRenderer
   readonly camera: PerspectiveCamera
-  readonly world: TestScene
+  readonly world: ValleyWorld
   readonly physics: Physics
   readonly heli: Helicopter
   readonly loop: GameLoop
@@ -63,16 +63,18 @@ export class Game {
     host.appendChild(this.renderer.domElement)
 
     this.camera = new PerspectiveCamera(gfx.fov, 1, 0.2, 20000)
-    this.world = new TestScene(this.renderer)
+    this.world = new ValleyWorld(this.renderer, this.camera)
     this.physics = new Physics(rapier, 1 / SIM_HZ)
     this.world.createColliders(this.physics)
     this.world.scene.add(this.physics.debugLines)
 
     this.heli = new Helicopter(this.physics, structuredClone(LITTLE_BIRD), heliModel)
-    this.heli.respawn(SPAWN, SPAWN_HEADING)
+    this.respawnHeli()
     this.world.scene.add(this.heli.object)
+    this.world.registerMaterials(this.heli.object)
 
     this.cameras = new CameraRig(this.camera, this.renderer.domElement)
+    this.cameras.onProjectionChange = () => this.world.updateFrustums()
     this.audio = new AudioEngine(settings.value.audio)
     this.heliSound = new HeliSoundRig(this.audio)
     if (this.heli.model.eye) this.cameras.eye.copy(this.heli.model.eye)
@@ -110,8 +112,12 @@ export class Game {
   }
 
   respawn(): void {
-    this.heli.respawn(SPAWN, SPAWN_HEADING)
+    this.respawnHeli()
     this.input.setCollective(0)
+  }
+
+  private respawnHeli(): void {
+    this.heli.respawn(this.world.spawn.position, this.world.spawn.heading)
   }
 
   private pollInput(dt: number): void {
@@ -138,7 +144,7 @@ export class Game {
     this.cameras.update(dt, this.heli.object, { yaw: s.lookYaw, pitch: s.lookPitch, active: s.buttons.freeLook.down })
 
     this.updateAudio(dt)
-    this.world.followSun(this.heli.object.position)
+    this.world.update()
     this.physics.updateDebug()
     this.renderer.render(this.world.scene, this.camera)
 
@@ -185,6 +191,8 @@ export class Game {
     if (t.vortexRing > 0.3) warnings.push('VORTEX RING')
     if (t.tailSaturation > 1) warnings.push('TAIL ROTOR LIMIT')
     if (Math.abs(this.attitude.roll) > 1.0 || Math.abs(this.attitude.pitch) > 0.9) warnings.push('ATTITUDE')
+    const edge = this.world.map.heightmap.half - EDGE_WARNING
+    if (Math.abs(h.state.position.x) > edge || Math.abs(h.state.position.z) > edge) warnings.push('LEAVING AREA')
 
     this.flightHud.update({
       airspeed: t.airspeed,
@@ -216,6 +224,7 @@ export class Game {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
+    this.world.updateFrustums()
   }
 
   private buildDebugUi(): void {
@@ -352,6 +361,7 @@ export class Game {
       .onChange(() => {
         this.camera.fov = gfx.fov
         this.camera.updateProjectionMatrix()
+        this.world.updateFrustums()
       })
       .onFinishChange(saveSettings)
     render

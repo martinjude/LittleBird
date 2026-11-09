@@ -34,6 +34,8 @@ export class CameraRig {
   readonly eye = new Vector3(-0.35, 1.75, 0.55)
 
   readonly orbit: OrbitControls
+  /** Called after the projection changes (near plane on mode switch), e.g. to refit shadow cascades. */
+  onProjectionChange?: () => void
 
   private heading = 0
   private initialised = false
@@ -62,6 +64,7 @@ export class CameraRig {
     this.orbit.enabled = mode === 'orbit'
     this.camera.near = mode === 'cockpit' ? 0.05 : 0.2
     this.camera.updateProjectionMatrix()
+    this.onProjectionChange?.()
     this.lookYaw = this.lookPitch = 0
     this.initialised = false
   }
