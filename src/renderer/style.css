@@ -1,0 +1,53 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #e8ecef;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  user-select: none;
+}
+
+#viewport,
+#viewport canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-banner {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+  opacity: 0.85;
+}
+
+.hud-banner strong {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.hud-banner kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 3px;
+  font: 11px/16px ui-monospace, Consolas, monospace;
+}
+
+.debug-hidden .lil-gui,
+.debug-hidden #stats {
+  display: none !important;
+}

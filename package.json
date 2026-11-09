@@ -1,0 +1,47 @@
+{
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/three": "^0.187.0",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "stats-gl": "^4.2.3",
+    "three": "^0.187.0"
+  },
+  "name": "littlebird",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Helicopter piloting game (Electron + three.js)",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
+    "test": "vitest run",
+    "dist": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.littlebird.game",
+    "productName": "LittleBird",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  }
+}

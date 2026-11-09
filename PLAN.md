@@ -1,0 +1,309 @@
+# LittleBird — Project Plan
+
+Helicopter piloting game built on **Electron + Three.js**. You fly an MH-6/AH-6 "Little Bird", moving troops between landing zones and giving light ground support.
+
+---
+
+## 1. MVP scope
+
+**In the MVP**
+- One helicopter: the Little Bird, with two loadouts on one airframe:
+  - **Transport (MH-6):** troops sit on the outboard benches, 4–6 seats.
+  - **Attack (AH-6):** 2× M134 miniguns and 2× rocket pods.
+- One map, about 4×4 km: a home base, 3–5 landing zones and one hostile area.
+- Cameras: cockpit (first person, free head-look) and chase (third person).
+- Controls: keyboard (with optional mouse) and gamepad (XInput/DualSense through the Gamepad API).
+- Game loop: pick up troops at A, fly to B, land in the LZ and unload. Score depends on time, how smoothly you land and how much damage you take.
+- Combat: enemy infantry and technicals near some LZs. You suppress them with guns and rockets. Enemies fire small arms and the helicopter takes damage.
+- High-quality audio: a layered rotor/turbine sound that reacts to flight state, a separate cockpit and outside mix, and positional weapon sounds with distance falloff.
+- Menus: main menu, mission select, pause, settings (key bindings, sensitivity, audio volumes, graphics).
+
+**Not in the MVP (later)**
+- Multiplayer, VR or TrackIR, more aircraft, a campaign, weather, night or NVG, sling loads, AI wingmen, full autorotation and failure simulation.
+
+---
+
+## 2. Tech stack
+
+| Concern | Choice | Why |
+|---|---|---|
+| Shell | **Electron 45** (stable) | Replaced the `46.0.0-alpha.7` that was installed. |
+| Build | **electron-vite** + **TypeScript** | One Vite config covers main, preload and renderer. Vite gives hot reload in the renderer. |
+| Rendering | **three.js** `WebGLRenderer` | Works with every Sketchfab GLB and with the `postprocessing` library. WebGPU can be evaluated after the MVP. |
+| Physics | **Rapier** (`@dimforge/rapier3d-compat`) | Handles rigid bodies, terrain heightfield colliders, raycasts for weapons and ground effect, and character controllers for troops. |
+| Flight model | **Custom code** (our own) | Computes forces and torques each physics step and applies them to the Rapier body. |
+| Audio | **Web Audio API**, through our own `AudioEngine` | Needs per-layer gain, pitch and filter automation, HRTF panning, convolution reverb and voice pooling. |
+| UI / HUD | HTML/CSS overlay | Quick to build and easy to restyle. The HUD text is plain DOM layered over the canvas. |
+| Debug | `lil-gui`, `stats-gl`, Rapier debug lines | Lets us tune flight parameters while the game runs. |
+| Assets | glTF/GLB → `gltf-transform` (meshopt + KTX2) | Smaller files and faster loading. |
+| Tests | **Vitest** | Unit tests for the flight model math, input mapping and mission state machine. |
+| Packaging | **electron-builder** | Produces the Windows installer or portable build. |
+
+---
+
+## 3. Architecture
+
+### 3.1 Electron process layout
+- **Main:** creates the window (fullscreen or borderless option), sets `backgroundThrottling: false`, and reads/writes `settings.json` and save files in `app.getPath('userData')`.
+- **Preload:** exposes a small typed API through `contextBridge`: `settings.load/save`, `saves.*` and `app.quit`.
+- **Renderer:** the whole game. It runs with `contextIsolation: true` and `nodeIntegration: false`.
+
+### 3.2 Game loop
+- **Fixed-timestep simulation** at 120 Hz. This covers the flight model, physics, weapons and AI.
+- **Variable-rate rendering**, with transforms interpolated between the last two simulation states.
+- Each frame runs in this order: input poll → sim steps → camera → audio params → render → HUD.
+
+### 3.3 Code organisation
+We use a small set of systems over plain entities. There is no full ECS framework for now. If the entity count grows, we can add `miniplex`.
+
+```
+src/
+  main/                 Electron main process
+  preload/              contextBridge API
+  renderer/
+    core/               Game loop, clock, events, asset loader, settings
+    input/              Devices (keyboard, mouse, gamepad), action map, bindings
+    flight/             Helicopter flight model (pure TS, unit-tested)
+    physics/            Rapier world wrapper, colliders, raycasts
+    vehicles/           Helicopter entity: model, rotors, damage, loadout
+    weapons/            Minigun, rockets, projectiles, hit detection
+    ai/                 Enemy infantry/technicals, simple state machines
+    troops/             Passenger boarding/unboarding, seat slots
+    missions/           Mission definitions, LZ triggers, objectives, scoring
+    world/              Terrain, vegetation (instanced), buildings, sky, lighting
+    camera/             Cockpit cam, chase cam, transitions
+    audio/              AudioEngine, heli sound rig, weapon sounds, mixer
+    fx/                 Rotor wash dust, muzzle flash, tracers, explosions
+    ui/                 HUD, menus, settings screens
+    debug/              lil-gui panels, stats, physics debug draw
+  shared/               Types shared by main/preload/renderer (IPC API, settings)
+public/                 Runtime (optimised) assets served to the renderer
+  models/  textures/  audio/  maps/
+assets/source/          Source masters: Blender files, raw GLBs, WAVs (git-ignored)
+tools/                  asset optimisation scripts (gltf-transform)
+```
+
+---
+
+## 4. Helicopter flight model
+
+The target is **"authentic-arcade"**. Flight should feel like a helicopter (torque, translational lift, ground effect), but stability assists make it playable on a controller.
+
+**Pilot inputs** (each normalised to −1…1 or 0…1)
+
+| Input | Effect |
+|---|---|
+| Collective | Main rotor thrust |
+| Cyclic pitch/roll | Tilts the thrust vector, creating pitch and roll moments |
+| Pedals | Changes tail rotor thrust, creating a yaw moment |
+
+**Forces and moments applied each simulation step**
+1. **Main rotor thrust** along the rotor mast. It scales with collective and air density, and changes with:
+   - **Ground effect:** more lift within about one rotor diameter of the ground. A downward raycast measures the height.
+   - **Effective translational lift:** extra lift at roughly 12–25 kt of airspeed.
+   - **Vortex ring state** (optional, can be toggled): lift is lost during a fast vertical descent at low airspeed.
+2. **Main rotor torque reaction:** a yaw moment that grows with collective. The tail rotor has to counter it.
+3. **Tail rotor:** produces a yaw moment from the pedals, and a small sideways force (translating tendency).
+4. **Cyclic moments:** produce pitch and roll rates, with damping.
+5. **Weathervaning:** the tail fin aligns the nose with the airflow when moving forward.
+6. **Drag:** parasitic drag on the body, split by axis (front, side and top each get a coefficient).
+7. **Gravity, and the Rapier contacts** for skids and ground.
+
+**Assist modes** (selectable in settings)
+- **Novice:** attitude hold, auto-trim, automatic torque compensation and an altitude hold helper.
+- **Standard:** rate damping plus automatic torque compensation.
+- **Realistic:** no assists, apart from a light stability augmentation system (SAS).
+
+**Implementation notes**
+- All tuning values live in one data file, `flight/littlebird.params.ts`, so they can be edited live in lil-gui.
+- The flight model stays pure functions in, forces out. That keeps it unit-testable and lets other helicopters reuse it later.
+- **Landing detection:** all skids are touching, vertical speed is below a limit, and the ground slope is under about 10°. "Smooth landing" scoring uses the same check.
+
+---
+
+## 5. Input
+
+**Action map layer**
+- Game code reads named actions such as `collective` (axis), `cyclicPitch` (axis), `firePrimary` (button) and `toggleCamera` (button). It never reads device keys directly.
+- Bindings are stored in a JSON profile and can be changed from the settings menu.
+- Per-axis settings: deadzone, response curve (expo), sensitivity and invert.
+- On keyboard, a digital key ramps an axis smoothly toward its target instead of jumping. For example, holding W raises the collective at a set rate.
+
+**Default bindings**
+
+| Action | Gamepad | Keyboard / mouse |
+|---|---|---|
+| Collective | Left stick Y | W / S |
+| Pedals (yaw) | Left stick X | A / D |
+| Cyclic | Right stick | Arrow keys, or mouse (optional mouse-flight mode) |
+| Head-look (cockpit) | Hold LB + right stick | Hold right mouse button + mouse |
+| Fire guns | RT | Space / left mouse button |
+| Fire rockets | LT | F |
+| Switch camera | View/Back | C |
+| Board / unload troops | A (while landed) | E |
+| Pause | Start | Esc |
+
+Gamepads use the Gamepad API's standard mapping. We also need to handle hot-plugging (controllers connected or disconnected mid-game) and show controller-specific button glyphs (Xbox or PlayStation).
+
+---
+
+## 6. Cameras
+- **Cockpit:** attached to an eye-point empty in the model.
+  - Free look is clamped to realistic angles.
+  - Subtle rotor vibration shake, which increases with the throttle.
+  - Field of view adjustable in settings.
+  - Instruments use simple gauge meshes or render targets: airspeed, altimeter, torque and heading.
+- **Chase:** a spring-damped follow camera behind and above the helicopter, which lags slightly on yaw. It collides with terrain so it never clips underground. An orbit mode is included.
+- **Switching:** a short blend between the two. Switching also crossfades the audio between the cockpit and outside mixes (see §8).
+
+---
+
+## 7. Assets pipeline (Sketchfab + Blender)
+
+**Conventions** (agreed once so every asset fits)
+- Units are **meters** and Y is up. glTF faces the model's front along +Z; the loader converts this once on import.
+- The helicopter model needs these named nodes:
+  - `Rotor_Main` and `Rotor_Tail`. Their pivots must sit on the rotation axis.
+  - `Rotor_Main_Blur`, an optional disc mesh shown at high RPM.
+  - `Eye_Pilot`: the cockpit camera position.
+  - `Seat_01` … `Seat_06`: troop seat positions.
+  - `Muzzle_L` / `Muzzle_R` and `Rocket_L` / `Rocket_R`: weapon firing points.
+  - `Skid_FL`, `Skid_FR`, `Skid_RL`, `Skid_RR`: contact points for landing checks.
+  - `COL_*`: simple collision proxy meshes. These are hidden at runtime and turned into Rapier colliders.
+- **Polygon budget:** about 30–60k triangles for the helicopter at the highest level of detail (LOD0), with LODs for distant views.
+- **PBR textures:** 2K for the helicopter and 1K for props. Compress them to KTX2.
+
+**Workflow**
+1. **Download** the asset from Sketchfab as glTF. **Record the license** in `assets/CREDITS.md`, since CC-BY requires attribution. Avoid "Editorial" or NoAI-restricted licenses for shipped content.
+2. **Clean up in Blender:** apply transforms, set the scale, fix pivots, add the named empties, and build `COL_*` proxies. Split animated parts (rotors, doors, gun barrels) into separate nodes.
+3. **Export a GLB** to `assets/source/`.
+4. **Optimise:** run `npm run assets` (`tools/optimize.ts`, using gltf-transform: dedup, prune, meshopt, KTX2) and write the result to `assets/models/`.
+5. **Load at runtime** with `GLTFLoader`, plus `MeshoptDecoder` and `KTX2Loader`.
+
+The Blender MCP connection is available in this environment, so I can help with checking scenes, naming nodes and exporting directly from Blender.
+
+**Helicopter model: to be chosen.** The first candidate (Hitoshi Matsui's MH-6) was rejected because of its Editorial license and missing cockpit. When choosing the next one, check:
+- The license allows use in a game (CC-BY, CC0, or Sketchfab Standard).
+- It has a cockpit interior, or we budget time to model one.
+- The rotors are separate objects or bones.
+
+Until then, `vehicles/PlaceholderHeli.ts` is a primitive stand-in that follows the same conventions.
+
+**Asset list for the MVP**
+- Little Bird: exterior, cockpit interior, MH-6 benches, AH-6 weapon pods.
+- Soldier: one rigged model with idle, run, sit and crouch-fire animations (Mixamo works well for the rigging and animations).
+- Enemy technical: a pickup truck with a mounted gun. Also some crates and sandbags.
+- Base: helipads, hangar, H-barriers. LZ props: smoke grenade, flag, marker panels.
+- Terrain: a heightmap made in Blender or Gaea, plus ground textures, trees and rocks (drawn with instancing).
+
+---
+
+## 8. Audio (high-quality focus)
+
+### 8.1 Engine
+- **`AudioEngine`** runs on Web Audio and contains:
+  - A master bus with sub-buses: `vehicle`, `weapons`, `world`, `ui` and `voice`. Each has its own volume control.
+  - A light `DynamicsCompressor`/limiter on the master bus, so firefights don't clip.
+  - A `PannerNode` with HRTF on each 3D source. The listener follows the active camera.
+  - A **voice pool** with priorities and a cap of about 48 simultaneous voices. When the pool is full, the quietest or lowest-priority sound is dropped.
+  - **Distance-based sound delay** for far events such as distant explosions (speed of sound, about 343 m/s). This adds a lot of realism.
+  - **Convolution reverb** per environment, for example open valley versus base or hangar.
+
+### 8.2 Helicopter sound rig
+A real helicopter's rotor speed barely changes, because it is governed. What you actually hear change is **blade loading**, so the rig is built around that. Each layer is a seamless loop crossfaded and modulated by flight-model values:
+
+| Layer | Driven by |
+|---|---|
+| Turbine whine (high) | Engine N1/torque: pitch and gain |
+| Rotor "thump" (low) | Rotor RPM: very small pitch change. Gain goes up with collective/load. |
+| Blade slap (BVI) | Strongest when descending under load or in hard turns |
+| Transmission / gearbox | Constant inside the cockpit, quiet outside |
+| Tail rotor buzz | Pedal input and yaw rate |
+| Wind / airflow | Airspeed: gain and high-pass filter |
+| Startup / shutdown | Sequenced one-shots crossfaded into the loops |
+
+**Cockpit and outside mixes**
+- **Cockpit:** low-pass filtered, with more transmission and the turbine and wind out of the doors. A headset-filtered radio sits on top.
+- **Outside:** full spectrum, with Doppler (computed manually from relative velocity, because Web Audio has no Doppler) and distance-based low-pass filtering.
+
+### 8.3 Weapons
+- **Minigun (M134):** fires 2,000–4,000 rounds per minute, which is too fast to play one sample per shot. It uses **spin-up → sustained loop → spin-down/tail** segments, with separate close and distant loops crossfaded by camera distance. Brass and link rattle sounds play in the cockpit.
+- **Rockets:** an ignition whoosh, a moving positional "flyby" source attached to each projectile, and an impact explosion with close, mid and far layers plus a delayed echo tail.
+- **Enemy small arms:** one-shots with 3–5 variations each, randomised pitch (about ±3%), and distance layers (close crack versus far pop). A supersonic **crack** plays when bullets pass close to the listener.
+- **Impacts:** different sounds per surface (dirt, metal, wood). Bullets hitting the helicopter make a distinct metallic ping, which tells the player they're under fire.
+
+### 8.4 Sources and format
+- Libraries: the Sonniss GDC bundles (free and royalty-free), BOOM Library and Pro Sound Effects (paid, high quality), and Freesound (check each license). Record any attribution in `assets/CREDITS.md`.
+- Keep the 48 kHz WAV masters in `assets/audio/source/`. Ship **Opus/OGG** files, encoded by an `npm run audio` script.
+- Edit the loops for seamless zero-crossing loop points before export.
+
+---
+
+## 9. Gameplay systems
+
+**Troops**
+- Troops are NPC agents. They move along nav waypoints to the helicopter, play a boarding animation, and snap to `Seat_*` nodes.
+- They only board when the helicopter is landed and stable inside the pickup zone.
+- Unloading runs the reverse sequence. Troops then run to a rally point.
+
+**Missions**
+- Missions are data-driven JSON: pickup LZ, drop LZ, number of troops, an optional time limit, and enemy spawn groups.
+- Each mission is a state machine: `Briefing → Pickup → InTransit → Drop → (Defend/Support) → RTB → Debrief`.
+
+**HUD**
+- Waypoint marker and distance, with LZ smoke as an in-world marker.
+- Troops aboard, ammo, damage and torque warnings.
+- Altitude above ground (AGL) and airspeed.
+
+**Combat**
+- Weapons use hitscan raycasts, with tracers drawn as instanced quads. Rockets are simulated projectiles with a small dispersion.
+- Enemy AI has the states Idle → Alert → Engage (fire at the helicopter if it's within range and line of sight) → Flee/Die.
+- Damage is tracked per component: engine, tail rotor, main rotor, fuel and crew. Losing the tail rotor causes uncontrolled spin, which is a strong gameplay moment and cheap to make.
+
+**FX**
+- Rotor wash: dust and grass particles below the helicopter, scaled by height and collective.
+- Muzzle flashes, tracers, impact puffs, and explosion sprites with light flashes.
+
+**Scoring**
+- Based on mission time, landing smoothness (vertical speed at touchdown), troops delivered safely, and damage taken.
+
+---
+
+## 10. Milestones
+
+Each milestone ends with something you can play or test.
+
+| # | Milestone | Done when |
+|---|---|---|
+| **M0** ✅ | **Scaffold** | electron-vite + TS + three run. The window shows a lit test scene. The fixed-timestep loop, lil-gui and stats are wired in. `git init`. |
+| **M1** | **Input layer** | Keyboard and gamepad are mapped to actions, with deadzones and curves. A debug overlay shows live axis values. Hot-plugging works. |
+| **M2** | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
+| **M3** | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
+| **M4** | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
+| **M5** | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
+| **M6** | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
+| **M7** | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |
+| **M8** | **MVP polish** | Menus, rebinding UI, settings persistence, loading screen, performance pass (LODs, culling, KTX2) and an electron-builder package. |
+
+Performance target: **60 fps at 1080p on a mid-range GPU**, for example GTX 1660 or RX 6600 class.
+
+---
+
+## 11. Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| The flight model feels bad on keyboard | Assist modes, ramped digital axes, and an optional mouse-flight mode. Playtest early (M2). |
+| Sketchfab assets are inconsistent (scale, pivots, licenses, heavy polygon counts) | Use the strict node naming and conventions checklist from §7, run every asset through the optimisation script, and keep the credits file up to date. |
+| Audio loops sound repetitive or phasey | Use long loops (10–30 s), crossfade by parameters rather than hard-switching, and add small random modulation. |
+| Large terrain causes depth-buffer z-fighting (flickering where surfaces overlap) | Tune the near/far planes per camera. Turn on `logarithmicDepthBuffer` if needed. |
+
+---
+
+## 12. Open decisions
+
+Each has a recommended default.
+1. **Realism level:** authentic-arcade with assist modes (recommended), versus hardcore sim.
+2. **Language:** TypeScript (recommended) versus plain JS.
+3. **Map setting/biome:** for example arid desert valley or temperate mountains. This drives the asset shopping list.
+4. **Weapon control on the AH-6:** pilot-fired fixed weapons (true to the AH-6, recommended), versus adding AI door gunners on the MH-6 later.
