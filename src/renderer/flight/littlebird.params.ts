@@ -63,13 +63,13 @@ export interface FlightParams {
 
 export const LITTLE_BIRD: FlightParams = {
   mass: 1100,
-  centerOfMass: [0, 1.25, 0.05],
+  centerOfMass: [0, 1.3, 0.1],
   inertia: [1700, 2300, 900],
   airDensity: 1.225,
 
   rotor: {
     radius: 4.15,
-    hub: [0, 2.7, 0],
+    hub: [0, 3.0, 0],
     maxThrust: 16700,
     climbLoss: 0.035,
     etlGain: 0.12,
@@ -88,14 +88,14 @@ export const LITTLE_BIRD: FlightParams = {
   torque: { reactionPerThrust: 0.22 },
 
   tailRotor: {
-    position: [0.12, 2.15, -5.55],
+    position: [0.29, 1.84, -5.62],
     maxMoment: 7000,
     pedalNeutral: 0.34,
   },
 
   dragArea: [4.5, 8, 1.2],
-  fin: { position: [0, 2.05, -5.45], area: 1.0 },
-  stabilizer: { position: [0, 1.6, -5.1], area: 0.6 },
+  fin: { position: [0, 2.0, -5.85], area: 1.0 },
+  stabilizer: { position: [0, 1.55, -5.3], area: 0.6 },
 
   vortexRing: { enabled: true, maxLoss: 0.35 },
 }

@@ -32,7 +32,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
     "test": "vitest run",
     "dist": "npm run build && electron-builder --win",
-    "model": "node tools/optimize-model.mjs"
+    "model": "node tools/optimize-model.mjs",
+    "model:littlebird": "node tools/optimize-model.mjs build assets/source/littlebird/scene.gltf public/models/littlebird.glb --config assets/littlebird.model.json"
   },
   "build": {
     "appId": "com.littlebird.game",

@@ -200,18 +200,20 @@ Gamepads use the Gamepad API's standard mapping. We also need to handle hot-plug
 
 The Blender MCP connection is available in this environment, so I can help with checking scenes, naming nodes and exporting directly from Blender.
 
-**Helicopter model: "Helicopters MH-6 Little Bird" by mario low poly**
+**Helicopter model: "Helicopters MH-6 Little Bird" by mario low poly**, CC BY 4.0 (credit in `CREDITS.md`)
 Link: [sketchfab.com/…/69cb05db3fc3483cb729734262abf28e](https://sketchfab.com/3d-models/helicopters-mh-6-little-bird-69cb05db3fc3483cb729734262abf28e)
 
-| Item | Details |
-|---|---|
-| License | **CC Attribution 4.0**. It's free to download, and any use (including commercial) is allowed with credit. The game is non-commercial anyway. **Credit required:** "Helicopters MH-6 Little Bird" by mario low poly (sketchfab.com/mariogpymario117), CC BY 4.0. This goes in `CREDITS.md` and the in-game credits. |
-| Geometry | About 27k triangles, 9 materials, 1 texture. That fits the 30–60k budget for the most detailed version. |
-| Animations | None, which is fine because the rotors are driven from code. |
-| To check after download (in Blender) | Whether the cockpit has an interior. Whether the rotors are separate objects. Whether it includes the MH-6 troop benches or the AH-6 weapon pods. Its scale and pivots. |
-| Expected work in Blender | Split out and re-pivot the rotors, add the named attachment points (eye point, seats, muzzles, skids, collision shapes), and model the missing parts. |
-
-`vehicles/PlaceholderHeli.ts` stays as the stand-in until this model reaches M3. The download stays out of git under `assets/source/`. Only the optimised GLB in `public/models/` gets committed.
+**As built (M3):**
+- The model is about 27k triangles. It includes the cockpit interior (seats, MFDs, cyclic), gun pods and an ammo loader. The rotors are separate nodes with clean pivots, so no Blender work was needed.
+- `assets/littlebird.model.json` is a prep config that the pipeline applies on build:
+  - flattens Sketchfab's wrapper nodes
+  - renames `Object_15` to `Rotor_Main` and `Object_13` to `Rotor_Tail`
+  - shifts the origin so the skids sit at y=0 under the mast
+  - adds the `Eye_Pilot` marker
+- `npm run model:littlebird` rebuilds `public/models/littlebird.glb` (0.5 MB, Meshopt-compressed, WebP textures). `npm run model -- inspect <file>` checks any model against the conventions.
+- At runtime, `GltfHeliModel` adds a cyclic tilt group above the main rotor and a blur disc sized from the blades. It fades a cloned blade material, because `dedup` merges materials. It also hides `COL_*` collision proxies.
+- If the GLB is missing, the game falls back to `PlaceholderHeliModel`.
+- Still to do: live instruments (the MFDs are static), named seat/muzzle/skid markers (add them to the prep config when M6/M7 need them), and LODs.
 
 **Asset list for the MVP**
 - Little Bird: exterior, cockpit interior, MH-6 benches, AH-6 weapon pods.
@@ -302,7 +304,7 @@ Each milestone ends with something you can play or test.
 | **M0** ✅ | **Scaffold** | electron-vite + TS + three run. The window shows a lit test scene. The fixed-timestep loop, lil-gui and stats are wired in. `git init`. |
 | **M1** ✅ | **Input layer** | Keyboard and gamepad are mapped to actions, with deadzones and curves. A debug overlay shows live axis values. Hot-plugging works. |
 | **M2** ✅ | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
-| **M3** | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
+| **M3** ✅ | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
 | **M4** | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
 | **M5** | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
 | **M6** | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |

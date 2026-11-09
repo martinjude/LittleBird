@@ -1,0 +1,15 @@
+{
+  "source": "assets/source/littlebird/scene.gltf",
+  "credit": "\"Helicopters MH-6 Little Bird\" by mario low poly (https://sketchfab.com/mariogpymario117), CC BY 4.0",
+  "flatten": true,
+  "rename": {
+    "Object_15": "Rotor_Main",
+    "Object_13": "Rotor_Tail",
+    "Object_4": "Canopy",
+    "Object_6": "Fuselage"
+  },
+  "offset": [-0.037, 0.3, 0.984],
+  "addNodes": {
+    "Eye_Pilot": [-0.33, 1.98, 0.2]
+  }
+}

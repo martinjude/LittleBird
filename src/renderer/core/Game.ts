@@ -11,6 +11,7 @@ import { Physics, type Rapier } from '../physics/Physics'
 import { FlightHud } from '../ui/FlightHud'
 import { Hud } from '../ui/Hud'
 import { InputOverlay } from '../ui/InputOverlay'
+import type { HeliModel } from '../vehicles/HeliModel'
 import { Helicopter } from '../vehicles/Helicopter'
 import { TestScene } from '../world/TestScene'
 import { GameLoop } from './GameLoop'
@@ -45,6 +46,7 @@ export class Game {
     private readonly settings: SettingsStore,
     keyboardLayout: KeyboardLayout,
     rapier: Rapier,
+    heliModel?: HeliModel,
   ) {
     const gfx = settings.value.graphics
 
@@ -61,11 +63,12 @@ export class Game {
     this.world.createColliders(this.physics)
     this.world.scene.add(this.physics.debugLines)
 
-    this.heli = new Helicopter(this.physics, structuredClone(LITTLE_BIRD))
+    this.heli = new Helicopter(this.physics, structuredClone(LITTLE_BIRD), heliModel)
     this.heli.respawn(SPAWN, SPAWN_HEADING)
     this.world.scene.add(this.heli.object)
 
     this.cameras = new CameraRig(this.camera, this.renderer.domElement)
+    if (this.heli.model.eye) this.cameras.eye.copy(this.heli.model.eye)
 
     const { controls, bindings } = settings.value
     const keyboardMouse = new BrowserKeyboardMouseSource(this.renderer.domElement)

@@ -6,6 +6,7 @@ import { FlightControlSystem, type PilotControls } from '../flight/Fcs'
 import { createFlightResult, FlightModel, type BodyState, type RotorControls } from '../flight/FlightModel'
 import type { FlightParams } from '../flight/littlebird.params'
 import type { Physics } from '../physics/Physics'
+import type { HeliModel } from './HeliModel'
 import { PlaceholderHeliModel } from './PlaceholderHeliModel'
 
 /** How far down to look for the ground (also drives the altitude readout). */
@@ -17,7 +18,6 @@ const Y_AXIS = new Vector3(0, 1, 0)
  * plus its visual model (interpolated between physics steps).
  */
 export class Helicopter {
-  readonly model = new PlaceholderHeliModel()
   readonly transform = new InterpolatedTransform()
   readonly flight: FlightModel
   readonly fcs: FlightControlSystem
@@ -41,6 +41,7 @@ export class Helicopter {
   constructor(
     private readonly physics: Physics,
     readonly params: FlightParams,
+    readonly model: HeliModel = new PlaceholderHeliModel(),
   ) {
     const { R, world } = physics
     this.flight = new FlightModel(params)
@@ -56,10 +57,11 @@ export class Helicopter {
       if (rot) desc.setRotation(rot)
       world.createCollider(desc, this.body)
     }
-    for (const x of [-0.95, 0.95]) part(R.ColliderDesc.capsule(1.45, 0.06), x, 0.06, 0.1, toZ) // skids
-    part(R.ColliderDesc.capsule(0.6, 1.0), 0, 1.35, 0, toZ) // fuselage
-    part(R.ColliderDesc.cuboid(0.15, 0.2, 2.3), 0, 1.65, -3.4) // tail boom
-    part(R.ColliderDesc.cuboid(0.05, 0.55, 0.3), 0, 2.05, -5.45) // fin
+    // Simple proxies sized to the Little Bird model (see assets/littlebird.model.json).
+    for (const x of [-0.95, 0.95]) part(R.ColliderDesc.capsule(1.5, 0.06), x, 0.06, 0.4, toZ) // skids
+    part(R.ColliderDesc.capsule(0.85, 0.95), 0, 1.45, 0.55, toZ) // cabin
+    part(R.ColliderDesc.cuboid(0.15, 0.2, 2.2), 0, 1.75, -3.6) // tail boom
+    part(R.ColliderDesc.cuboid(0.05, 0.6, 0.35), 0, 2.0, -5.85) // fin
   }
 
   get object(): Object3D {

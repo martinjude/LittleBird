@@ -30,7 +30,7 @@ export class CameraRig {
     /** Positional smoothing (1/s); higher = stiffer. */
     stiffness: 14,
   }
-  /** Pilot eye point in body space (right seat; +X is left). */
+  /** Pilot eye point in body space (right seat; +X is left). Set from the model's `Eye_Pilot`. */
   readonly eye = new Vector3(-0.35, 1.75, 0.55)
 
   readonly orbit: OrbitControls

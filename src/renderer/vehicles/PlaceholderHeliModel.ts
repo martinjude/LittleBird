@@ -9,8 +9,10 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   SphereGeometry,
+  Vector3,
   type Material,
 } from 'three'
+import type { HeliModel } from './HeliModel'
 
 const TAU = Math.PI * 2
 const MAIN_ROTOR_RADIUS = 4.15
@@ -23,8 +25,9 @@ const TAIL_ROTOR_RATIO = 6
  * Follows the model conventions from PLAN.md §7: meters, +Y up, nose along +Z,
  * origin at the bottom of the skids.
  */
-export class PlaceholderHeliModel {
+export class PlaceholderHeliModel implements HeliModel {
   readonly object = new Group()
+  readonly eye = new Vector3(-0.35, 1.75, 0.55)
 
   /** Tilts with the cyclic; the spinning rotor hangs off it. */
   private readonly rotorTilt = new Group()
