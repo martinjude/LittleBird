@@ -1,4 +1,6 @@
 import { ACESFilmicToneMapping, MathUtils, PCFShadowMap, PerspectiveCamera, Vector3, WebGLRenderer, type Material, type Mesh } from 'three'
+import { AudioEngine } from '../audio/AudioEngine'
+import { HeliSoundRig, type LayerName } from '../audio/HeliSoundRig'
 import { CameraRig, type CameraMode } from '../camera/CameraRig'
 import { Debug } from '../debug/Debug'
 import { attitudeOf } from '../flight/Fcs'
@@ -30,6 +32,8 @@ export class Game {
   readonly loop: GameLoop
   readonly input: InputSystem
   readonly cameras: CameraRig
+  readonly audio: AudioEngine
+  readonly heliSound: HeliSoundRig
   /** World wind velocity (m/s), set from the debug panel. */
   readonly wind = new Vector3()
   readonly windSetting = { speed: 0, fromDeg: 270 }
@@ -39,6 +43,7 @@ export class Game {
   private readonly flightHud: FlightHud
   private readonly inputOverlay: InputOverlay
   private readonly attitude = { pitch: 0, roll: 0, heading: 0 }
+  private audioPaused = false
 
   constructor(
     private readonly host: HTMLElement,
@@ -68,6 +73,8 @@ export class Game {
     this.world.scene.add(this.heli.object)
 
     this.cameras = new CameraRig(this.camera, this.renderer.domElement)
+    this.audio = new AudioEngine(settings.value.audio)
+    this.heliSound = new HeliSoundRig(this.audio)
     if (this.heli.model.eye) this.cameras.eye.copy(this.heli.model.eye)
 
     const { controls, bindings } = settings.value
@@ -130,6 +137,7 @@ export class Game {
     this.heli.model.setCockpitView(this.cameras.mode === 'cockpit')
     this.cameras.update(dt, this.heli.object, { yaw: s.lookYaw, pitch: s.lookPitch, active: s.buttons.freeLook.down })
 
+    this.updateAudio(dt)
     this.world.followSun(this.heli.object.position)
     this.physics.updateDebug()
     this.renderer.render(this.world.scene, this.camera)
@@ -138,6 +146,33 @@ export class Game {
     this.updateFlightHud()
     this.inputOverlay.update(s)
     this.debug.update()
+  }
+
+  private updateAudio(dt: number): void {
+    if (this.loop.paused !== this.audioPaused) {
+      this.audioPaused = this.loop.paused
+      this.audio.setPaused(this.audioPaused)
+    }
+    const h = this.heli
+    const t = h.result.telemetry
+    this.audio.updateListener(this.camera, dt)
+    this.heliSound.update(dt, {
+      position: h.object.position,
+      velocity: h.state.velocity,
+      rpmRatio: 1,
+      torque: this.engineTorque(),
+      load: t.thrust / (h.params.mass * 9.81),
+      verticalSpeed: h.verticalSpeed,
+      airspeed: t.airspeed,
+      tailUse: t.tailSaturation,
+      vortexRing: t.vortexRing,
+      interior: this.cameras.mode === 'cockpit',
+    })
+  }
+
+  /** Rough engine torque: power ~ thrust^1.5, scaled so full collective at rest reads 100%. */
+  private engineTorque(): number {
+    return (this.heli.result.telemetry.thrust / this.heli.params.rotor.maxThrust) ** 1.5
   }
 
   private updateFlightHud(): void {
@@ -157,8 +192,7 @@ export class Game {
       verticalSpeed: h.verticalSpeed,
       heading: this.attitude.heading,
       collective: this.input.state.collective,
-      // Rough engine torque: power ~ thrust^1.5, scaled so full collective at rest reads 100%.
-      torque: (t.thrust / h.params.rotor.maxThrust) ** 1.5,
+      torque: this.engineTorque(),
       assist: this.settings.value.controls.assist,
       camera: this.cameras.mode,
       inGroundEffect: t.groundEffect > 1.02,
@@ -263,6 +297,28 @@ export class Game {
     assist.add(fcs.coordinationSpeed, 0, 0, 40, 1).name('turn coord. from (m/s)')
     assist.add(fcs.coordinationSpeed, 1, 1, 60, 1).name('turn coord. full (m/s)')
     assist.close()
+
+    const vol = this.settings.value.audio
+    const audio = gui.addFolder('Audio')
+    for (const key of ['master', 'vehicle', 'weapons', 'world', 'ui'] as const) {
+      audio
+        .add(vol, key, 0, 1, 0.01)
+        .onChange(() => this.audio.applyVolumes(vol))
+        .onFinishChange(saveSettings)
+    }
+    const layers = audio.addFolder('Helicopter layers')
+    for (const name of Object.keys(this.heliSound.trim) as LayerName[]) layers.add(this.heliSound.trim, name, 0, 2, 0.05)
+    const status = { context: '', sources: '', voices: 0 }
+    audio.add(status, 'context').disable().listen()
+    audio.add(status, 'sources').name('recordings').disable().listen()
+    audio.add(status, 'voices').name('one-shot voices').disable().listen()
+    setInterval(() => {
+      status.context = this.audio.ctx.state
+      const loaded = Object.entries(this.heliSound.layers).filter(([, l]) => l.usingSample)
+      status.sources = loaded.length ? loaded.map(([n]) => n).join(', ') : 'none (synth stand-ins)'
+      status.voices = this.audio.activeVoices
+    }, 500)
+    audio.close()
 
     const chase = gui.addFolder('Chase camera')
     chase.add(this.cameras.chase, 'distance', 5, 40, 0.5)

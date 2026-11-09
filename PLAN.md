@@ -252,6 +252,18 @@ A real helicopter's rotor speed barely changes, because it is governed. What you
 - **Cockpit:** low-pass filtered, with more transmission and the turbine and wind out of the doors. A headset-filtered radio sits on top.
 - **Outside:** full spectrum, with Doppler (computed manually from relative velocity, because Web Audio has no Doppler) and distance-based low-pass filtering.
 
+**As built (M4):**
+- `audio/AudioEngine.ts` sets up the audio graph:
+  - vehicle, weapons, world and UI buses feeding a master bus and a limiter
+  - a shared outdoor convolution reverb
+  - an HRTF listener that follows the camera and tracks its velocity
+  - a 48-voice one-shot pool that steals the lowest-priority, oldest voice, with an optional speed-of-sound delay
+- `audio/HeliSoundRig.ts` has six looping layers: rotor, slap, turbine, gearbox, tail and wind.
+  - Each layer is shaped by rpm, torque, load, vertical speed, airspeed, tail-rotor use and vortex ring state.
+  - Each layer splits into an exterior mix (air absorption, then panner, then reverb, with manual Doppler) and an interior mix (airframe low-pass plus a headset shelf). The two cross-fade when the camera switches.
+- **Stand-in sounds:** every layer is generated in code by `audio/synth.ts`, so the game has sound with no assets. Dropping `public/audio/heli/<rotor|slap|turbine|gearbox|tail|wind>.ogg` replaces a layer automatically. The debug panel's Audio folder shows which layers are recordings, and has volumes and per-layer trims.
+- Still to do: engine start-up and shutdown sequences (needs rotor RPM simulation), a WAV-to-Opus encode script (needs ffmpeg), and mixing against real recordings.
+
 ### 8.3 Weapons
 - **Minigun (M134):** fires 2,000–4,000 rounds per minute, which is too fast to play one sample per shot. It uses **spin-up → sustained loop → spin-down/tail** segments, with separate close and distant loops crossfaded by camera distance. Brass and link rattle sounds play in the cockpit.
 - **Rockets:** an ignition whoosh, a moving positional "flyby" source attached to each projectile, and an impact explosion with close, mid and far layers plus a delayed echo tail.
@@ -305,7 +317,7 @@ Each milestone ends with something you can play or test.
 | **M1** ✅ | **Input layer** | Keyboard and gamepad are mapped to actions, with deadzones and curves. A debug overlay shows live axis values. Hot-plugging works. |
 | **M2** ✅ | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
 | **M3** ✅ | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
-| **M4** | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
+| **M4** ✅ | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
 | **M5** | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
 | **M6** | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
 | **M7** | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |

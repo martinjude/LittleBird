@@ -23,7 +23,7 @@ export class Hud {
     const key = padType ?? 'keyboard'
     if (key === this.shown) return
     this.shown = key
-    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M3 Little Bird<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
+    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M4 audio<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
   }
 
   private keyboardHint(): string {

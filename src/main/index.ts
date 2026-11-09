@@ -25,6 +25,8 @@ function createWindow(): BrowserWindow {
       sandbox: true,
       // The game loop must keep running when the window is unfocused.
       backgroundThrottling: false,
+      // Engine sound should start with the game, not wait for a click.
+      autoplayPolicy: 'no-user-gesture-required',
     },
   })
 
