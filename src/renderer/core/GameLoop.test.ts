@@ -62,6 +62,21 @@ describe('GameLoop', () => {
     expect(record.steps).toBe(1)
   })
 
+  it('polls input before simulating, even while paused', () => {
+    const calls: string[] = []
+    const loop = new GameLoop({
+      input: () => calls.push('input'),
+      fixedUpdate: () => calls.push('step'),
+      frame: () => calls.push('frame'),
+    })
+    loop.advance(1 / 60)
+    expect(calls).toEqual(['input', 'step', 'step', 'frame'])
+    loop.paused = true
+    calls.length = 0
+    loop.advance(1 / 60)
+    expect(calls).toEqual(['input', 'frame'])
+  })
+
   it('applies time scale', () => {
     const { loop, record } = makeLoop()
     loop.timeScale = 0.5

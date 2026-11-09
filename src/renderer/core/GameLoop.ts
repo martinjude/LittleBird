@@ -1,4 +1,6 @@
 export interface LoopHandlers {
+  /** Called once per frame before any simulation steps (also while paused): poll input here. */
+  input?(dt: number): void
   /** Advances the simulation by exactly `dt` seconds (always `GameLoop.fixedDt`). */
   fixedUpdate(dt: number): void
   /**
@@ -63,6 +65,8 @@ export class GameLoop {
   advance(realDt: number): number {
     const dt = Math.min(Math.max(realDt, 0), this.maxFrameDt)
     let steps = 0
+
+    this.handlers.input?.(dt)
 
     if (!this.paused) {
       this.accumulator += dt * this.timeScale

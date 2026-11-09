@@ -1,11 +1,10 @@
 import { Game } from './core/Game'
 import { SettingsStore } from './core/SettingsStore'
-import { Hud } from './ui/Hud'
+import { loadKeyboardLayout } from './input/labels'
 
 async function boot(): Promise<void> {
-  const settings = await SettingsStore.load()
-  const game = new Game(document.getElementById('viewport')!, settings)
-  new Hud(document.getElementById('hud')!)
+  const [settings, keyboardLayout] = await Promise.all([SettingsStore.load(), loadKeyboardLayout()])
+  const game = new Game(document.getElementById('viewport')!, document.getElementById('hud')!, settings, keyboardLayout)
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'F3') {

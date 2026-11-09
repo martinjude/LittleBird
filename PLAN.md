@@ -145,6 +145,13 @@ The target is **"authentic-arcade"**. Flight should feel like a helicopter (torq
 
 Gamepads use the Gamepad API's standard mapping. We also need to handle hot-plugging (controllers connected or disconnected mid-game) and show controller-specific button glyphs (Xbox or PlayStation).
 
+**As built (M1):**
+- Keys are bound by *physical position* (`KeyboardEvent.code`). The default WASD layout therefore lands on ZQSD on AZERTY keyboards. On-screen hints show the user's real key labels, using the Keyboard Layout API.
+- The collective is a lever that stays where you leave it. The gamepad stick has two modes: `rate`, the default, where the stick moves the lever; and `absolute`, where the stick position is the lever position.
+- Holding LB for gamepad free-look freezes the cyclic at its last value, so the helicopter doesn't follow the camera.
+- A key that goes down and up within one frame is still seen for one frame, so quick taps aren't lost.
+- Bindings and tuning are saved in the settings (`src/shared/bindings.ts`, `controls` in `src/shared/settings.ts`). The rebinding UI comes in M8.
+
 ---
 
 ## 6. Cameras
@@ -282,7 +289,7 @@ Each milestone ends with something you can play or test.
 | # | Milestone | Done when |
 |---|---|---|
 | **M0** ✅ | **Scaffold** | electron-vite + TS + three run. The window shows a lit test scene. The fixed-timestep loop, lil-gui and stats are wired in. `git init`. |
-| **M1** | **Input layer** | Keyboard and gamepad are mapped to actions, with deadzones and curves. A debug overlay shows live axis values. Hot-plugging works. |
+| **M1** ✅ | **Input layer** | Keyboard and gamepad are mapped to actions, with deadzones and curves. A debug overlay shows live axis values. Hot-plugging works. |
 | **M2** | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
 | **M3** | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
 | **M4** | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
