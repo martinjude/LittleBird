@@ -324,6 +324,27 @@ A real helicopter's rotor speed barely changes, because it is governed. What you
 - Enemy AI has the states Idle → Alert → Engage (fire at the helicopter if it's within range and line of sight) → Flee/Die.
 - Damage is tracked per component: engine, tail rotor, main rotor, fuel and crew. Losing the tail rotor causes uncontrolled spin, which is a strong gameplay moment and cheap to make.
 
+
+**As built (M7):**
+- **Weapons** (`combat/HeliWeapons.ts`):
+  - Twin M134 miniguns: 0.35 s spin-up, about 66 rounds/s combined, 850 m/s rounds with ballistic drop, 4 mrad dispersion, a tracer every 5th round, 3,000 rounds total.
+  - 14 Hydra 70 rockets: boost to about 740 m/s, a smoke trail, and a 14 m blast. They arm after 0.3 s (about 60 m), so you can't blow yourself up.
+  - Guns and rockets are bore-sighted 2.5° nose-down. The HUD pipper marks where the gun line meets the ground.
+- **Projectiles:** every round is swept by a raycast each step. The result routes to a helicopter part (cockpit or engine, depending on hit position, then tail boom, fin, skids), an enemy unit, or the scenery.
+- **Enemies** (`combat/EnemyForce.ts`): 9 infantry and 2 DShK technicals around LZ Delta in the "Hot LZ" mission.
+  - They check line of sight by raycast, so terrain and trees block it, and they lead their shots.
+  - Spread grows with range and with the helicopter's speed. They fire bursts with green tracers.
+  - Infantry go down in about 3 rounds. Technicals need sustained fire or a rocket, then explode and burn.
+- **Damage** (`vehicles/HeliDamage.ts`): engine, tail rotor, main rotor, pilot and airframe.
+  - A failed engine leaves 25% of thrust. A failed tail rotor means no anti-torque, so the aircraft spins.
+  - A rotor-strike sensor around the disc kills lift if it touches anything.
+  - Rotor damage shakes the camera, and a damaged engine trails smoke.
+  - Losing the pilot or the airframe fails the mission. The aircraft is repaired and rearmed between missions.
+- **Effects:** additive fire particles, dust/smoke particles, tracer line segments, and a pool of 4 flash lights (fixed count, so no shader recompiles).
+- **Audio:** stand-ins generated in code for the minigun loop and spin whine, rocket, explosion (with speed-of-sound delay), rifle, DShK, metal hits, supersonic cracks for near misses, and dirt hits. `public/audio/sfx/<name>.ogg` replaces any of them.
+- **Tuning:** hovering 500 m from the LZ costs about 30% of the airframe in 16 s, so you need to keep moving.
+- Not done yet: enemy movement and cover, RPGs and MANPADS, troops fighting after insertion, autorotation (needs a rotor RPM model), and door gunners.
+
 **FX**
 - Rotor wash: dust and grass particles below the helicopter, scaled by height and collective.
 - Muzzle flashes, tracers, impact puffs, and explosion sprites with light flashes.
@@ -346,7 +367,7 @@ Each milestone ends with something you can play or test.
 | **M4** ✅ | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
 | **M5** ✅ | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
 | **M6** ✅ | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
-| **M7** | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |
+| **M7** ✅ | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |
 | **M8** | **MVP polish** | Menus, rebinding UI, settings persistence, loading screen, performance pass (LODs, culling, KTX2) and an electron-builder package. |
 
 Performance target: **60 fps at 1080p on a mid-range GPU**, for example GTX 1660 or RX 6600 class.

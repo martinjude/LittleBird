@@ -23,7 +23,7 @@ export class Hud {
     const key = padType ?? 'keyboard'
     if (key === this.shown) return
     this.shown = key
-    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M6 missions<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
+    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M7 combat<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
   }
 
   private keyboardHint(): string {
@@ -35,6 +35,8 @@ export class Hud {
       `Pedals ${k(kb.axes.pedals.negative[0])}${k(kb.axes.pedals.positive[0])}`,
       `Cyclic ${pair(kb.axes.cyclicPitch)}${k(kb.axes.cyclicRoll.negative[0])}${k(kb.axes.cyclicRoll.positive[0])}`,
       `Look hold ${k(kb.buttons.freeLook[0])}`,
+      `Guns ${k(kb.buttons.fireGuns[0])}`,
+      `Rockets ${k(kb.buttons.fireRockets[0])}`,
       `Interact ${k(kb.buttons.interact[0])}`,
       `Camera ${k(kb.buttons.toggleCamera[0])}`,
       `Reset ${k(kb.buttons.reset[0])}`,
@@ -52,6 +54,8 @@ export class Hud {
       `Pedals ${s(pad.axes.pedals.axis)}`,
       `Cyclic <kbd>Right stick</kbd>`,
       `Look hold ${b(pad.buttons.freeLook[0])} + right stick`,
+      `Guns ${b(pad.buttons.fireGuns[0])}`,
+      `Rockets ${b(pad.buttons.fireRockets[0])}`,
       `Interact ${b(pad.buttons.interact[0])}`,
       `Camera ${b(pad.buttons.toggleCamera[0])}`,
       `Reset ${b(pad.buttons.reset[0])}`,

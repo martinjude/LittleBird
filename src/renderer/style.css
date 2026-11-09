@@ -401,3 +401,90 @@ body {
 .mc-failed .mc-title {
   color: #ff9a8a;
 }
+
+/* --- Weapons HUD ------------------------------------------------------- */
+
+.reticle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid rgb(160 255 170 / 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgb(0 0 0 / 0.6);
+}
+
+.reticle.spinning {
+  border-color: rgb(255 210 90 / 0.95);
+}
+
+.reticle-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: rgb(160 255 170 / 0.95);
+}
+
+.weapon-panel {
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgb(8 14 10 / 0.55);
+  font: 12px ui-monospace, Consolas, monospace;
+  color: #c9f7d4;
+  text-align: right;
+}
+
+.wp-ammo {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: pre;
+}
+
+.wp-lights {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.wp-lights span {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dmg-ok {
+  background: rgb(80 170 90 / 0.35);
+}
+
+.dmg-warn {
+  background: #b89a2a;
+  color: #111;
+}
+
+.dmg-bad {
+  background: #d8742c;
+  color: #111;
+}
+
+.dmg-dead {
+  background: #d8342c;
+  color: #fff;
+}
+
+.hit-flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(200 20 10 / 0.9) 100%);
+}

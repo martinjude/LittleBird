@@ -16,14 +16,32 @@ export interface SoldierRig {
 export type SoldierPose = 'idle' | 'run' | 'sit' | 'kneel'
 
 const HIP_HEIGHT = 0.95
-const materials = {
-  uniform: new MeshStandardMaterial({ color: 0x8a7f5c, roughness: 0.95 }),
-  gear: new MeshStandardMaterial({ color: 0x55593a, roughness: 0.9 }),
-  skin: new MeshStandardMaterial({ color: 0xc69c7a, roughness: 0.8 }),
-  dark: new MeshStandardMaterial({ color: 0x252525, roughness: 0.6, metalness: 0.3 }),
+export interface SoldierPalette {
+  uniform: number
+  gear: number
 }
 
-export function buildSoldier(): SoldierRig {
+export const FRIENDLY: SoldierPalette = { uniform: 0x8a7f5c, gear: 0x55593a }
+export const HOSTILE: SoldierPalette = { uniform: 0x4e4a40, gear: 0x2f2b26 }
+
+const skin = new MeshStandardMaterial({ color: 0xc69c7a, roughness: 0.8 })
+const dark = new MeshStandardMaterial({ color: 0x252525, roughness: 0.6, metalness: 0.3 })
+const paletteMaterials = new Map<SoldierPalette, { uniform: MeshStandardMaterial; gear: MeshStandardMaterial }>()
+
+function materialsFor(palette: SoldierPalette) {
+  let m = paletteMaterials.get(palette)
+  if (!m) {
+    m = {
+      uniform: new MeshStandardMaterial({ color: palette.uniform, roughness: 0.95 }),
+      gear: new MeshStandardMaterial({ color: palette.gear, roughness: 0.9 }),
+    }
+    paletteMaterials.set(palette, m)
+  }
+  return { ...m, skin, dark }
+}
+
+export function buildSoldier(palette: SoldierPalette = FRIENDLY): SoldierRig {
+  const materials = materialsFor(palette)
   const root = new Group()
   root.name = 'Soldier'
   const body = new Group()

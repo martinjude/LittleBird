@@ -6,6 +6,7 @@ import { FlightControlSystem, type PilotControls } from '../flight/Fcs'
 import { createFlightResult, FlightModel, type BodyState, type RotorControls } from '../flight/FlightModel'
 import type { FlightParams } from '../flight/littlebird.params'
 import type { Physics } from '../physics/Physics'
+import { HeliDamage, type HeliPart } from './HeliDamage'
 import type { HeliModel } from './HeliModel'
 import { PlaceholderHeliModel } from './PlaceholderHeliModel'
 
@@ -32,6 +33,7 @@ export class Helicopter {
   }
   readonly result = createFlightResult()
   readonly rotor: RotorControls = { collective: 0, pitch: 0, roll: 0, yaw: 0, antiTorque: 'auto' }
+  readonly damage: HeliDamage
   /** Height of the skids above the ground (m). */
   agl = 0
   /** Aircraft mass without passengers or cargo (kg); `params.mass` = this + payload. */
@@ -40,6 +42,10 @@ export class Helicopter {
 
   private readonly hub = new Vector3()
   private readonly tmp = new Vector3()
+  /** Collider handle → which part of the airframe it represents. */
+  private readonly partByCollider = new Map<number, 'cabin' | HeliPart>()
+  /** Thin disc around the main rotor; anything solid inside it is a rotor strike. */
+  private readonly rotorSensor: RAPIER.Collider
 
   constructor(
     private readonly physics: Physics,
@@ -50,22 +56,48 @@ export class Helicopter {
     this.emptyMass = params.mass
     this.flight = new FlightModel(params)
     this.fcs = new FlightControlSystem(params)
+    this.damage = new HeliDamage(params)
 
     // Mass and inertia come from the flight params, not from collider volumes.
     this.body = world.createRigidBody(R.RigidBodyDesc.dynamic().setCcdEnabled(true).setCanSleep(false))
     this.applyMassProperties()
 
     const toZ = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2)
-    const part = (desc: RAPIER.ColliderDesc, x: number, y: number, z: number, rot?: Quaternion) => {
+    const part = (name: 'cabin' | HeliPart, desc: RAPIER.ColliderDesc, x: number, y: number, z: number, rot?: Quaternion) => {
       desc.setTranslation(x, y, z).setDensity(0).setFriction(0.7).setRestitution(0.05)
       if (rot) desc.setRotation(rot)
-      world.createCollider(desc, this.body)
+      this.partByCollider.set(world.createCollider(desc, this.body).handle, name)
     }
     // Simple proxies sized to the Little Bird model (see assets/littlebird.model.json).
-    for (const x of [-0.95, 0.95]) part(R.ColliderDesc.capsule(1.5, 0.06), x, 0.06, 0.4, toZ) // skids
-    part(R.ColliderDesc.capsule(0.85, 0.95), 0, 1.45, 0.55, toZ) // cabin
-    part(R.ColliderDesc.cuboid(0.15, 0.2, 2.2), 0, 1.75, -3.6) // tail boom
-    part(R.ColliderDesc.cuboid(0.05, 0.6, 0.35), 0, 2.0, -5.85) // fin
+    for (const x of [-0.95, 0.95]) part('skids', R.ColliderDesc.capsule(1.5, 0.06), x, 0.06, 0.4, toZ)
+    part('cabin', R.ColliderDesc.capsule(0.85, 0.95), 0, 1.45, 0.55, toZ)
+    part('tailboom', R.ColliderDesc.cuboid(0.15, 0.2, 2.2), 0, 1.75, -3.6)
+    part('fin', R.ColliderDesc.cuboid(0.05, 0.6, 0.35), 0, 2.0, -5.85)
+
+    const [hx, hy, hz] = params.rotor.hub
+    this.rotorSensor = world.createCollider(
+      R.ColliderDesc.cylinder(0.12, params.rotor.radius).setTranslation(hx, hy, hz).setSensor(true).setDensity(0),
+      this.body,
+    )
+  }
+
+  /** Which part a round hit, or null if the collider isn't ours. Cabin hits split into cockpit (front) and engine (rear). */
+  partHit(colliderHandle: number, worldPoint: Vector3): HeliPart | null {
+    const part = this.partByCollider.get(colliderHandle)
+    if (!part) return null
+    if (part !== 'cabin') return part
+    const local = this.tmp.copy(worldPoint).sub(this.state.position).applyQuaternion(this.state.quaternion.clone().invert())
+    return local.z > 0.5 ? 'cockpit' : 'engine'
+  }
+
+  /** True if anything solid (terrain, trees, buildings, people) is inside the rotor disc. Call after a physics step. */
+  rotorStrike(): boolean {
+    let struck = false
+    this.physics.world.intersectionPairsWith(this.rotorSensor, (other) => {
+      if (other.parent()?.handle !== this.body.handle && !other.isSensor()) struck = true
+      return !struck
+    })
+    return struck
   }
 
   get object(): Object3D {
@@ -101,6 +133,7 @@ export class Helicopter {
     this.transform.teleport(position, q)
     this.readBody()
     this.fcs.reset()
+    this.damage.reset()
   }
 
   /** Runs before each physics step: computes and applies the aerodynamic forces. */

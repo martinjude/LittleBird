@@ -14,6 +14,8 @@ import { FlightHud } from '../ui/FlightHud'
 import { Hud } from '../ui/Hud'
 import { InputOverlay } from '../ui/InputOverlay'
 import { MissionDirector } from '../missions/MissionDirector'
+import { Combat } from '../combat/Combat'
+import { WeaponHud } from '../ui/WeaponHud'
 import { MISSIONS } from '../missions/missions'
 import { TROOP_MASS } from '../troops/TroopSquad'
 import { keyLabel, padButtonLabel } from '../input/labels'
@@ -47,6 +49,11 @@ export class Game {
   private readonly flightHud: FlightHud
   private readonly inputOverlay: InputOverlay
   readonly missions: MissionDirector
+  readonly combat: Combat
+  private readonly weaponHud: WeaponHud
+  private readonly aimPoint = new Vector3()
+  private readonly aimDir = new Vector3()
+  private readonly aimRay: InstanceType<Rapier['Ray']>
   private readonly attitude = { pitch: 0, roll: 0, heading: 0 }
   private audioPaused = false
 
@@ -91,7 +98,10 @@ export class Game {
     this.hud = new Hud(hudRoot, bindings, keyboardLayout)
     this.flightHud = new FlightHud(hudRoot)
     this.inputOverlay = new InputOverlay(hudRoot)
-    this.missions = new MissionDirector(this.world, this.heli, this.audio, hudRoot)
+    this.combat = new Combat(this.world, this.physics, this.heli, this.audio)
+    this.weaponHud = new WeaponHud(hudRoot)
+    this.aimRay = new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })
+    this.missions = new MissionDirector(this.world, this.heli, this.audio, this.combat, hudRoot)
     this.missions.onRetry = () => this.respawn(false)
 
     this.loop = new GameLoop(
@@ -138,10 +148,12 @@ export class Game {
   }
 
   private fixedUpdate(): void {
-    const s = this.input.state
+    // A dead pilot flies nothing.
+    const s = this.heli.damage.hp.pilot > 0 ? this.input.state : { collective: 0, cyclicPitch: 0, cyclicRoll: 0, pedals: 0 }
     this.heli.beforeStep(s, this.settings.value.controls.assist, this.wind)
     this.physics.step()
     this.heli.afterStep()
+    this.combat.fixedUpdate()
     this.missions.fixedUpdate(this.loop.fixedDt)
   }
 
@@ -151,6 +163,7 @@ export class Game {
 
     const s = this.input.state
     this.heli.model.setCockpitView(this.cameras.mode === 'cockpit')
+    this.cameras.shake = this.heli.damage.vibration
     this.cameras.update(dt, this.heli.object, { yaw: s.lookYaw, pitch: s.lookPitch, active: s.buttons.freeLook.down })
 
     this.missions.update(
@@ -162,6 +175,10 @@ export class Game {
       this.host.clientHeight,
       this.wind,
     )
+    if (simDt > 0) {
+      const b = s.buttons
+      this.combat.update(simDt, { guns: b.fireGuns.down, rockets: b.fireRockets.down, rocketsPressed: b.fireRockets.pressed }, this.wind)
+    }
     this.updateAudio(dt)
     this.world.update()
     this.physics.updateDebug()
@@ -169,6 +186,7 @@ export class Game {
 
     this.hud.update(s)
     this.updateFlightHud()
+    this.updateWeaponHud()
     this.inputOverlay.update(s)
     this.debug.update()
   }
@@ -218,6 +236,7 @@ export class Game {
     if (t.vortexRing > 0.3) warnings.push('VORTEX RING')
     if (t.tailSaturation > 1) warnings.push('TAIL ROTOR LIMIT')
     if (Math.abs(this.attitude.roll) > 1.0 || Math.abs(this.attitude.pitch) > 0.9) warnings.push('ATTITUDE')
+    warnings.push(...h.damage.warnings())
     const edge = this.world.map.heightmap.half - EDGE_WARNING
     if (Math.abs(h.state.position.x) > edge || Math.abs(h.state.position.z) > edge) warnings.push('LEAVING AREA')
 
@@ -234,6 +253,23 @@ export class Game {
       landed,
       warnings,
     })
+  }
+
+  private updateWeaponHud(): void {
+    const w = this.combat.weapons
+    const heli = this.heli.object
+    // Pipper: where the gun line meets the ground (or 600 m out if nothing is in range).
+    w.boresight(this.aimDir)
+    this.aimRay.origin = { x: heli.position.x, y: heli.position.y + 0.7, z: heli.position.z }
+    this.aimRay.dir = { x: this.aimDir.x, y: this.aimDir.y, z: this.aimDir.z }
+    const hit = this.physics.world.castRay(this.aimRay, 1500, true, this.physics.R.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, this.heli.body)
+    this.aimPoint.copy(heli.position).setY(heli.position.y + 0.7).addScaledVector(this.aimDir, hit ? hit.timeOfImpact : 600)
+    this.weaponHud.update(
+      { aimPoint: this.aimPoint, gunAmmo: w.gunAmmo, rockets: w.rockets, spin: w.spin, hp: this.heli.damage.hp, hitFlash: this.combat.hitFlash },
+      this.camera,
+      this.host.clientWidth,
+      this.host.clientHeight,
+    )
   }
 
   private updateWind(): void {
@@ -253,6 +289,7 @@ export class Game {
     this.camera.updateProjectionMatrix()
     this.world.updateFrustums()
     this.missions?.setViewport(height, this.camera.fov)
+    this.combat?.setViewport(height, this.camera.fov)
   }
 
   private buildDebugUi(): void {
@@ -401,6 +438,7 @@ export class Game {
         this.camera.updateProjectionMatrix()
         this.world.updateFrustums()
         this.missions.setViewport(this.host.clientHeight, gfx.fov)
+        this.combat.setViewport(this.host.clientHeight, gfx.fov)
       })
       .onFinishChange(saveSettings)
     render

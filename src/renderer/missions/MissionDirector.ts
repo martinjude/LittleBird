@@ -1,5 +1,6 @@
 import { BoxGeometry, Mesh, MeshStandardMaterial, Vector3, type Camera, type Object3D } from 'three'
 import type { AudioEngine } from '../audio/AudioEngine'
+import type { Combat } from '../combat/Combat'
 import { chime } from '../audio/synth'
 import { attitudeOf } from '../flight/Fcs'
 import { Smoke } from '../fx/Smoke'
@@ -40,6 +41,7 @@ export class MissionDirector {
     private readonly world: ValleyWorld,
     private readonly heli: Helicopter,
     private readonly audio: AudioEngine,
+    private readonly combat: Combat,
     hudRoot: HTMLElement,
   ) {
     this.squad = new TroopSquad((x, z) => world.heightAt(x, z), SEATS, (o) => world.registerMaterials(o))
@@ -59,10 +61,18 @@ export class MissionDirector {
 
   start(index: number): void {
     this.missionIndex = ((index % MISSIONS.length) + MISSIONS.length) % MISSIONS.length
-    this.runner.start(MISSIONS[this.missionIndex])
+    const mission = MISSIONS[this.missionIndex]
+    this.runner.start(mission)
     this.smoke.clear()
     this.heli.setPayload(0)
     this.landing.reset(true)
+    // Repaired and rearmed at the FOB between sorties.
+    this.heli.damage.reset()
+    this.combat.reset()
+    if (mission.hostiles) {
+      const lz = this.runner.drop!.kind === 'lz' ? this.runner.drop! : this.runner.pickup!
+      this.combat.enemies.spawnAround(lz)
+    }
   }
 
   /** Every physics step: watch the skids. */
@@ -94,12 +104,17 @@ export class MissionDirector {
       r.update(simDt, {
         heliPosition: heliPos,
         landed: this.landing.settled,
-        crashed: this.landing.crashed,
+        crashed: this.landing.crashed ?? this.heli.damage.destroyed,
         touchdown: this.landing.lastTouchdown,
         interactPressed,
       })
     }
     this.handleEvents()
+    if (this.combat.newKills > 0) {
+      const alive = this.combat.enemies.alive
+      this.hud.toast(this.combat.newKills > 1 ? `${this.combat.newKills} enemies down` : `Enemy down${alive ? ` · ${alive} left` : ' · area clear'}`, 'good')
+      this.combat.newKills = 0
+    }
 
     if (simDt > 0) {
       this.squad.update(simDt, this.heli.object)
@@ -174,9 +189,12 @@ export class MissionDirector {
           this.smoke.emit(new Vector3(e.site.x + 6, e.site.y, e.site.z + 6), SMOKE_COLORS[this.runner.mission!.smoke])
           this.hud.toast(`${e.site.name} popping ${this.runner.mission!.smoke} smoke`)
           break
-        case 'complete':
+        case 'complete': {
+          const kills = this.combat.enemies.kills
+          if (kills > 0) this.runner.score.push({ label: `Enemies neutralised ×${kills}`, points: kills * 20 })
           this.play('good')
           break
+        }
         case 'failed':
           this.failure = e.reason
           this.play('bad')

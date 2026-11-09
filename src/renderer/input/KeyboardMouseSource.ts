@@ -40,7 +40,8 @@ export class BrowserKeyboardMouseSource implements KeyboardMouseSource {
       this.down.add(code)
       this.tapped.add(code)
       this.activity = true
-      if (this.lockButtons.has(code)) element.requestPointerLock()
+      // Pointer lock can be refused (embedded previews, no user activation); free-look still works without it.
+      if (this.lockButtons.has(code)) void Promise.resolve(element.requestPointerLock()).catch(() => {})
     })
     window.addEventListener('mouseup', (e) => {
       const code = `Mouse${e.button}`

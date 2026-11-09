@@ -8,6 +8,8 @@ export interface MissionDef {
   troops: number
   /** Smoke colour marking the LZ. */
   smoke: 'green' | 'yellow' | 'purple' | 'red'
+  /** Enemies are dug in around the LZ (the non-base end of the route). */
+  hostiles?: boolean
 }
 
 /** The MVP mission set, flown in order. */
@@ -47,6 +49,17 @@ export const MISSIONS: MissionDef[] = [
     drop: 'base',
     troops: 4,
     smoke: 'red',
+  },
+  {
+    id: 'hot-lz',
+    name: 'Hot LZ',
+    briefing:
+      'Insurgents with two DShK technicals have dug in around LZ Delta. Insert a four-man assault team. Suppress the LZ with guns and rockets on the way in, and keep your speed up: a hovering Little Bird is an easy target.',
+    pickup: 'base',
+    drop: 'lz-delta',
+    troops: 4,
+    smoke: 'red',
+    hostiles: true,
   },
 ]
 

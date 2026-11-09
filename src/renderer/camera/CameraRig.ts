@@ -34,6 +34,8 @@ export class CameraRig {
   readonly eye = new Vector3(-0.35, 1.75, 0.55)
 
   readonly orbit: OrbitControls
+  /** Camera shake amount 0..1 (rotor damage vibration). */
+  shake = 0
   /** Called after the projection changes (near plane on mode switch), e.g. to refit shadow cascades. */
   onProjectionChange?: () => void
 
@@ -79,6 +81,12 @@ export class CameraRig {
     if (this.mode === 'chase') this.updateChase(dt, target)
     else if (this.mode === 'cockpit') this.updateCockpit(target)
     else this.updateOrbit(dt, target)
+    if (this.shake > 0 && this.mode !== 'orbit') {
+      const a = this.shake * (this.mode === 'cockpit' ? 0.03 : 0.12)
+      this.camera.position.x += (Math.random() - 0.5) * a
+      this.camera.position.y += (Math.random() - 0.5) * a
+      this.camera.position.z += (Math.random() - 0.5) * a
+    }
   }
 
   private updateLook(dt: number, look: LookInput): void {
