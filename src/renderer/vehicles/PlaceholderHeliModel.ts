@@ -5,44 +5,35 @@ import {
   DoubleSide,
   Group,
   MathUtils,
-  Matrix4,
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
-  Quaternion,
   SphereGeometry,
-  Vector3,
   type Material,
 } from 'three'
-import { InterpolatedTransform } from '../core/Interpolation'
 
 const TAU = Math.PI * 2
-const GRAVITY = 9.81
 const MAIN_ROTOR_RADIUS = 4.15
 const MAIN_ROTOR_BLADES = 6
 const TAIL_ROTOR_RATIO = 6
 
 /**
- * Primitive stand-in for the Little Bird until the real GLB arrives (M3).
+ * Primitive stand-in for the Little Bird until the real GLB arrives (M3). Visual only:
+ * the Helicopter entity drives its transform, rotor spin and disc tilt.
  * Follows the model conventions from PLAN.md §7: meters, +Y up, nose along +Z,
  * origin at the bottom of the skids.
- *
- * For M0 it flies a scripted circuit so the fixed-step interpolation and camera
- * can be checked; M2 replaces the script with the flight model.
  */
-export class PlaceholderHeli {
+export class PlaceholderHeliModel {
   readonly object = new Group()
-  readonly transform = new InterpolatedTransform()
-  readonly params = { radius: 150, altitude: 25, speed: 22, rotorRpm: 470 }
 
+  /** Tilts with the cyclic; the spinning rotor hangs off it. */
+  private readonly rotorTilt = new Group()
   private readonly mainRotor = new Group()
   private readonly tailRotor = new Group()
   private readonly bladeMaterial: MeshStandardMaterial
   private readonly discMaterial: MeshStandardMaterial
-  private pathAngle = 0
-
-  private readonly tmpPos = new Vector3()
-  private readonly tmpQuat = new Quaternion()
+  /** From inside, a spinning rotor is all but invisible; drawing the blur disc there just blocks the view. */
+  private cockpitView = false
 
   constructor() {
     this.object.name = 'PlaceholderHeli'
@@ -55,50 +46,28 @@ export class PlaceholderHeli {
       side: DoubleSide,
     })
     this.build()
-
-    this.computePose(this.pathAngle, this.tmpPos, this.tmpQuat)
-    this.transform.teleport(this.tmpPos, this.tmpQuat)
-    this.transform.applyTo(this.object, 1)
   }
 
-  fixedUpdate(dt: number): void {
-    this.transform.snapshot()
-    this.pathAngle = (this.pathAngle + (this.params.speed / this.params.radius) * dt) % TAU
-    this.computePose(this.pathAngle, this.transform.position, this.transform.quaternion)
-  }
-
-  /** @param dt simulation-scaled seconds since last frame (0 while paused). */
-  render(alpha: number, dt: number): void {
-    this.transform.applyTo(this.object, alpha)
-
-    const omega = (this.params.rotorRpm * TAU) / 60
+  /**
+   * @param dt simulation-scaled seconds since the last frame (0 while paused)
+   * @param tilt disc tilt in radians (forward = +pitch, right = +roll)
+   */
+  animate(dt: number, rotorRpm: number, tilt: { pitch: number; roll: number }): void {
+    const omega = (rotorRpm * TAU) / 60
     // Counter-clockwise seen from above, like US-built helicopters.
     this.mainRotor.rotation.y = (this.mainRotor.rotation.y + omega * dt) % TAU
     this.tailRotor.rotation.x = (this.tailRotor.rotation.x + omega * TAIL_ROTOR_RATIO * dt) % TAU
+    this.rotorTilt.rotation.set(tilt.pitch, 0, tilt.roll)
 
     // Individual blades strobe at real RPM, so fade them into a disc as the rotor spins up.
-    const blur = MathUtils.smoothstep(this.params.rotorRpm, 80, 300)
+    const blur = MathUtils.smoothstep(rotorRpm, 80, 300)
     this.bladeMaterial.opacity = 1 - 0.85 * blur
     this.discMaterial.opacity = 0.22 * blur
+    this.mainRotor.visible = !(this.cockpitView && blur > 0.5)
   }
 
-  /** Scripted circuit: a level-ish banked circle around the origin. */
-  private computePose(angle: number, outPos: Vector3, outQuat: Quaternion): void {
-    const { radius, altitude, speed } = this.params
-    const cos = Math.cos(angle)
-    const sin = Math.sin(angle)
-    outPos.set(cos * radius, altitude + Math.sin(angle * 3) * 3, sin * radius)
-
-    // Rotor thrust must cancel gravity and provide centripetal acceleration,
-    // so body-up tilts toward the circle's centre — that's the bank.
-    const centripetal = (speed * speed) / radius
-    const up = new Vector3(-cos * centripetal, GRAVITY, -sin * centripetal).normalize()
-    const forward = new Vector3(-sin, 0, cos)
-    const side = new Vector3().crossVectors(up, forward).normalize()
-    forward.crossVectors(side, up)
-    outQuat.setFromRotationMatrix(new Matrix4().makeBasis(side, up, forward))
-    // Slight nose-down attitude in forward flight.
-    outQuat.multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), MathUtils.degToRad(5)))
+  setCockpitView(enabled: boolean): void {
+    this.cockpitView = enabled
   }
 
   private build(): void {
@@ -156,9 +125,10 @@ export class PlaceholderHeli {
     // Mast + main rotor.
     const mast = add(mesh(new CylinderGeometry(0.08, 0.1, 0.45, 10), metal))
     mast.position.set(0, 2.45, 0)
+    this.rotorTilt.position.set(0, 2.7, 0)
+    this.object.add(this.rotorTilt)
     this.mainRotor.name = 'Rotor_Main'
-    this.mainRotor.position.set(0, 2.7, 0)
-    this.object.add(this.mainRotor)
+    this.rotorTilt.add(this.mainRotor)
     add(mesh(new CylinderGeometry(0.18, 0.18, 0.12, 12), metal), this.mainRotor)
     const bladeGeo = new BoxGeometry(0.2, 0.035, MAIN_ROTOR_RADIUS).translate(0, 0, MAIN_ROTOR_RADIUS / 2)
     for (let i = 0; i < MAIN_ROTOR_BLADES; i++) {

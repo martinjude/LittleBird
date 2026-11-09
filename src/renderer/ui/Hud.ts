@@ -3,7 +3,7 @@ import type { InputState } from '../input/InputSystem'
 import type { PadType } from '../input/GamepadSource'
 import { keyLabel, padButtonLabel, padStickLabel, type KeyboardLayout } from '../input/labels'
 
-/** DOM overlay on top of the 3D view. M1: controls hint that follows the active device. */
+/** Controls hint along the bottom of the screen; follows the active input device. */
 export class Hud {
   private readonly banner: HTMLElement
   private shown = ''
@@ -23,7 +23,7 @@ export class Hud {
     const key = padType ?? 'keyboard'
     if (key === this.shown) return
     this.shown = key
-    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M1 input<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
+    this.banner.innerHTML = `<strong>LITTLEBIRD</strong> · M2 flight<br />${padType ? this.padHint(padType) : this.keyboardHint()}`
   }
 
   private keyboardHint(): string {
@@ -35,6 +35,8 @@ export class Hud {
       `Pedals ${k(kb.axes.pedals.negative[0])}${k(kb.axes.pedals.positive[0])}`,
       `Cyclic ${pair(kb.axes.cyclicPitch)}${k(kb.axes.cyclicRoll.negative[0])}${k(kb.axes.cyclicRoll.positive[0])}`,
       `Look hold ${k(kb.buttons.freeLook[0])}`,
+      `Camera ${k(kb.buttons.toggleCamera[0])}`,
+      `Reset ${k(kb.buttons.reset[0])}`,
       `Pause ${k(kb.buttons.pause[0])}`,
       `<kbd>F3</kbd> debug · <kbd>F11</kbd> fullscreen`,
     ].join(' · ')
@@ -49,6 +51,8 @@ export class Hud {
       `Pedals ${s(pad.axes.pedals.axis)}`,
       `Cyclic <kbd>Right stick</kbd>`,
       `Look hold ${b(pad.buttons.freeLook[0])} + right stick`,
+      `Camera ${b(pad.buttons.toggleCamera[0])}`,
+      `Reset ${b(pad.buttons.reset[0])}`,
       `Pause ${b(pad.buttons.pause[0])}`,
     ].join(' · ')
   }

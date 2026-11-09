@@ -2,7 +2,7 @@
 
 A helicopter piloting game built with Electron and three.js. Fly the MH-6/AH-6 Little Bird: move troops between landing zones and give light ground support. You can play in a cockpit view or a third-person view, with a keyboard or a gamepad.
 
-> Early development. See [PLAN.md](PLAN.md) for the roadmap. Milestones **M0 (scaffold)** and **M1 (input)** are done.
+> Early development. See [PLAN.md](PLAN.md) for the roadmap. Milestones **M0 (scaffold)**, **M1 (input)** and **M2 (flight model)** are done.
 
 ## Getting started
 
@@ -21,7 +21,7 @@ npm run dev
 | `npm test` | Runs the unit tests (Vitest) |
 | `npm run dist` | Packages a Windows build into `release/` |
 
-In-game: <kbd>F3</kbd> toggles the debug panel, <kbd>F11</kbd> toggles fullscreen and <kbd>F12</kbd> opens DevTools (dev builds only).
+In-game: <kbd>C</kbd> switches chase/cockpit view, <kbd>R</kbd> resets on the pad, <kbd>F3</kbd> toggles the debug panel (assist mode, flight tuning, wind), <kbd>F11</kbd> toggles fullscreen and <kbd>F12</kbd> opens DevTools (dev builds only).
 
 ## Credits
 

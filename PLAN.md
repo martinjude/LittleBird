@@ -119,6 +119,17 @@ The target is **"authentic-arcade"**. Flight should feel like a helicopter (torq
 - The flight model stays pure functions in, forces out. That keeps it unit-testable and lets other helicopters reuse it later.
 - **Landing detection:** all skids are touching, vertical speed is below a limit, and the ground slope is under about 10°. "Smooth landing" scoring uses the same check.
 
+
+**As built (M2):**
+- `flight/FlightModel.ts` contains pure functions and is unit-tested. Rotor, tail rotor, fin and stabiliser are applied as point forces, so side effects such as tail-rotor drift and roll come from the geometry. The flight control system (`flight/Fcs.ts`) sits between the stick and the rotor.
+- The assist modes as built:
+  - **Novice:** the stick sets the attitude angle, and centring it levels the helicopter.
+  - **Standard:** the stick sets a rotation rate. Attitude and heading are held when the stick is centred, inside a soft envelope of about 26° pitch and 46° bank. Above about 20 kt, heading hold hands over to turn coordination.
+  - **Realistic:** the stick drives the rotor directly, with light stability augmentation. The pedals have to counter torque manually.
+- The debug panel shows live tuning values and telemetry, plus wind and a physics wireframe. **Copy params as JSON** exports tuned values to paste back into `littlebird.params.ts`.
+- Cameras: chase (follows heading, spring-damped), cockpit (eye point, free head-look) and a dev orbit camera.
+- Not done yet: engine start-up and rotor RPM droop, damage or crashes, and dynamic rollover.
+
 ---
 
 ## 5. Input
@@ -290,7 +301,7 @@ Each milestone ends with something you can play or test.
 |---|---|---|
 | **M0** ✅ | **Scaffold** | electron-vite + TS + three run. The window shows a lit test scene. The fixed-timestep loop, lil-gui and stats are wired in. `git init`. |
 | **M1** ✅ | **Input layer** | Keyboard and gamepad are mapped to actions, with deadzones and curves. A debug overlay shows live axis values. Hot-plugging works. |
-| **M2** | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
+| **M2** ✅ | **Flight model v1** | A placeholder box helicopter flies over a flat test map with physics. All forces from §4 work and parameters can be tuned live. The chase camera works. |
 | **M3** | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
 | **M4** | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
 | **M5** | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |

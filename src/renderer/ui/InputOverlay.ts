@@ -8,6 +8,7 @@ const CHIP_LABELS: Record<ButtonAction, string> = {
   interact: 'Interact',
   freeLook: 'Look',
   pause: 'Pause',
+  reset: 'Reset',
 }
 
 /** Debug readout of live input actions (shown with the F3 debug panel). */

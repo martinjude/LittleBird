@@ -9,7 +9,7 @@
  *  - pedals       -1..1  +1 = right pedal (nose yaws right)
  */
 export type AxisAction = 'collective' | 'cyclicPitch' | 'cyclicRoll' | 'pedals'
-export type ButtonAction = 'fireGuns' | 'fireRockets' | 'toggleCamera' | 'interact' | 'freeLook' | 'pause'
+export type ButtonAction = 'fireGuns' | 'fireRockets' | 'toggleCamera' | 'interact' | 'freeLook' | 'pause' | 'reset'
 
 export const AXIS_ACTIONS: readonly AxisAction[] = ['collective', 'cyclicPitch', 'cyclicRoll', 'pedals']
 export const BUTTON_ACTIONS: readonly ButtonAction[] = [
@@ -19,6 +19,7 @@ export const BUTTON_ACTIONS: readonly ButtonAction[] = [
   'interact',
   'freeLook',
   'pause',
+  'reset',
 ]
 
 /** Keys that push an axis toward -1 / +1. Values are `KeyboardEvent.code` (physical key, layout-independent). */
@@ -69,6 +70,7 @@ export const DEFAULT_BINDINGS: Bindings = {
       interact: ['KeyE'],
       freeLook: ['Mouse2'],
       pause: ['Escape', 'KeyP'],
+      reset: ['KeyR'],
     },
   },
   gamepad: {
@@ -85,6 +87,7 @@ export const DEFAULT_BINDINGS: Bindings = {
       interact: [PAD.A],
       freeLook: [PAD.LB],
       pause: [PAD.MENU],
+      reset: [PAD.Y],
     },
   },
 }

@@ -23,11 +23,21 @@ import {
 } from 'three'
 import { Sky } from 'three/addons/objects/Sky.js'
 import { createRandom } from '../core/random'
+import type { Physics } from '../physics/Physics'
 
 const GROUND_SIZE = 8000
 /** World-space size of one ground texture tile, in meters. */
 const GROUND_TILE = 20
 const HAZE_COLOR = 0xc3d2e0
+
+interface Obstacle {
+  shape: 'box' | 'cone'
+  /** Centre of the base, on the ground. */
+  position: Vector3
+  yaw: number
+  /** Box: width/height/depth. Cone: base diameter/height/base diameter. */
+  size: Vector3
+}
 
 /**
  * M0 placeholder world: sky + image-based lighting, a gridded ground plane for
@@ -38,6 +48,7 @@ export class TestScene {
   readonly scene = new Scene()
   readonly sun = new DirectionalLight(0xfff1e0, 3.5)
   private readonly sunDirection = new Vector3()
+  private readonly obstacles: Obstacle[] = []
 
   constructor(renderer: WebGLRenderer) {
     const elevation = 38
@@ -50,6 +61,24 @@ export class TestScene {
     this.addGround(renderer)
     this.addHelipad()
     this.addProps()
+  }
+
+  /** Static colliders matching the visible ground and props. */
+  createColliders(physics: Physics): void {
+    const { R, world } = physics
+    const groundBody = world.createRigidBody(R.RigidBodyDesc.fixed())
+    world.createCollider(
+      R.ColliderDesc.cuboid(GROUND_SIZE / 2, 1, GROUND_SIZE / 2).setTranslation(0, -1, 0).setFriction(0.9),
+      groundBody,
+    )
+    for (const o of this.obstacles) {
+      const half = o.size.y / 2
+      const desc =
+        o.shape === 'box' ? R.ColliderDesc.cuboid(o.size.x / 2, half, o.size.z / 2) : R.ColliderDesc.cone(half, o.size.x / 2)
+      const rot = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), o.yaw)
+      desc.setTranslation(o.position.x, o.position.y + half, o.position.z).setRotation(rot)
+      world.createCollider(desc, groundBody)
+    }
   }
 
   /** Keeps the shadow frustum centred on the area of interest (usually the player). */
@@ -155,8 +184,10 @@ export class TestScene {
     for (let i = 0; i < blockCount; i++) {
       scatter(60, 1800)
       scale.set(4 + rand() * 18, 3 + rand() ** 2 * 55, 4 + rand() * 18)
-      rot.setFromAxisAngle(up, rand() * Math.PI)
+      const yaw = rand() * Math.PI
+      rot.setFromAxisAngle(up, yaw)
       blocks.setMatrixAt(i, m.compose(pos, rot, scale))
+      this.obstacles.push({ shape: 'box', position: pos.clone(), yaw, size: scale.clone() })
       blocks.setColorAt(i, color.setHSL(0.08 + rand() * 0.06, 0.15, 0.35 + rand() * 0.25))
     }
     blocks.castShadow = blocks.receiveShadow = true
@@ -175,6 +206,7 @@ export class TestScene {
       const r = h * (0.22 + rand() * 0.12)
       scale.set(r, h, r)
       trees.setMatrixAt(i, m.compose(pos, rot.identity(), scale))
+      this.obstacles.push({ shape: 'cone', position: pos.clone(), yaw: 0, size: new Vector3(r * 2, h, r * 2) })
       trees.setColorAt(i, color.setHSL(0.25 + rand() * 0.08, 0.35, 0.16 + rand() * 0.1))
     }
     trees.castShadow = trees.receiveShadow = true
