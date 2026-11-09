@@ -62,7 +62,7 @@ export interface FlightParams {
 }
 
 export const LITTLE_BIRD: FlightParams = {
-  mass: 1100,
+  mass: 1000,
   centerOfMass: [0, 1.3, 0.1],
   inertia: [1700, 2300, 900],
   airDensity: 1.225,

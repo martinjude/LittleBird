@@ -34,6 +34,9 @@ export class Helicopter {
   readonly rotor: RotorControls = { collective: 0, pitch: 0, roll: 0, yaw: 0, antiTorque: 'auto' }
   /** Height of the skids above the ground (m). */
   agl = 0
+  /** Aircraft mass without passengers or cargo (kg); `params.mass` = this + payload. */
+  emptyMass: number
+  private payload = 0
 
   private readonly hub = new Vector3()
   private readonly tmp = new Vector3()
@@ -44,6 +47,7 @@ export class Helicopter {
     readonly model: HeliModel = new PlaceholderHeliModel(),
   ) {
     const { R, world } = physics
+    this.emptyMass = params.mass
     this.flight = new FlightModel(params)
     this.fcs = new FlightControlSystem(params)
 
@@ -74,6 +78,14 @@ export class Helicopter {
     const [cx, cy, cz] = p.centerOfMass
     const [ix, iy, iz] = p.inertia
     this.body.setAdditionalMassProperties(p.mass, { x: cx, y: cy, z: cz }, { x: ix, y: iy, z: iz }, { x: 0, y: 0, z: 0, w: 1 }, true)
+  }
+
+  /** Sets the carried load (kg) on top of the empty mass. */
+  setPayload(kg: number): void {
+    if (kg === this.payload && this.params.mass === this.emptyMass + kg) return
+    this.payload = kg
+    this.params.mass = this.emptyMass + kg
+    this.applyMassProperties()
   }
 
   /** Places the helicopter at rest; `heading` is compass radians (0 = north/-Z). */

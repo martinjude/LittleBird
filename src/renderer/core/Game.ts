@@ -13,6 +13,10 @@ import { Physics, type Rapier } from '../physics/Physics'
 import { FlightHud } from '../ui/FlightHud'
 import { Hud } from '../ui/Hud'
 import { InputOverlay } from '../ui/InputOverlay'
+import { MissionDirector } from '../missions/MissionDirector'
+import { MISSIONS } from '../missions/missions'
+import { TROOP_MASS } from '../troops/TroopSquad'
+import { keyLabel, padButtonLabel } from '../input/labels'
 import type { HeliModel } from '../vehicles/HeliModel'
 import { Helicopter } from '../vehicles/Helicopter'
 import { ValleyWorld } from '../world/ValleyWorld'
@@ -42,6 +46,7 @@ export class Game {
   private readonly hud: Hud
   private readonly flightHud: FlightHud
   private readonly inputOverlay: InputOverlay
+  readonly missions: MissionDirector
   private readonly attitude = { pitch: 0, roll: 0, heading: 0 }
   private audioPaused = false
 
@@ -49,7 +54,7 @@ export class Game {
     private readonly host: HTMLElement,
     hudRoot: HTMLElement,
     private readonly settings: SettingsStore,
-    keyboardLayout: KeyboardLayout,
+    private readonly keyboardLayout: KeyboardLayout,
     rapier: Rapier,
     heliModel?: HeliModel,
   ) {
@@ -86,6 +91,8 @@ export class Game {
     this.hud = new Hud(hudRoot, bindings, keyboardLayout)
     this.flightHud = new FlightHud(hudRoot)
     this.inputOverlay = new InputOverlay(hudRoot)
+    this.missions = new MissionDirector(this.world, this.heli, this.audio, hudRoot)
+    this.missions.onRetry = () => this.respawn(false)
 
     this.loop = new GameLoop(
       {
@@ -111,9 +118,11 @@ export class Game {
     this.debug.toggle()
   }
 
-  respawn(): void {
+  /** Back on the FOB pad; by default the current mission restarts from its briefing. */
+  respawn(restartMission = true): void {
     this.respawnHeli()
     this.input.setCollective(0)
+    if (restartMission) this.missions.start(this.missions.missionIndex)
   }
 
   private respawnHeli(): void {
@@ -133,6 +142,7 @@ export class Game {
     this.heli.beforeStep(s, this.settings.value.controls.assist, this.wind)
     this.physics.step()
     this.heli.afterStep()
+    this.missions.fixedUpdate(this.loop.fixedDt)
   }
 
   private frame(dt: number, alpha: number): void {
@@ -143,6 +153,15 @@ export class Game {
     this.heli.model.setCockpitView(this.cameras.mode === 'cockpit')
     this.cameras.update(dt, this.heli.object, { yaw: s.lookYaw, pitch: s.lookPitch, active: s.buttons.freeLook.down })
 
+    this.missions.update(
+      simDt,
+      s.buttons.interact.pressed,
+      this.interactLabel(),
+      this.camera,
+      this.host.clientWidth,
+      this.host.clientHeight,
+      this.wind,
+    )
     this.updateAudio(dt)
     this.world.update()
     this.physics.updateDebug()
@@ -174,6 +193,14 @@ export class Game {
       vortexRing: t.vortexRing,
       interior: this.cameras.mode === 'cockpit',
     })
+  }
+
+  private interactLabel(): string {
+    const { bindings } = this.settings.value
+    const s = this.input.state
+    return s.device === 'gamepad' && s.pad
+      ? padButtonLabel(bindings.gamepad.buttons.interact[0], s.pad.type)
+      : keyLabel(bindings.keyboard.buttons.interact[0], this.keyboardLayout)
   }
 
   /** Rough engine torque: power ~ thrust^1.5, scaled so full collective at rest reads 100%. */
@@ -225,6 +252,7 @@ export class Game {
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
     this.world.updateFrustums()
+    this.missions?.setViewport(height, this.camera.fov)
   }
 
   private buildDebugUi(): void {
@@ -240,6 +268,13 @@ export class Game {
     sim.add(this.loop, 'timeScale', 0, 2, 0.05)
     sim.add({ step: () => this.loop.step() }, 'step').name('step (while paused)')
     sim.add({ respawn: () => this.respawn() }, 'respawn')
+    const missionPick = { mission: 0 }
+    sim
+      .add(missionPick, 'mission', Object.fromEntries(MISSIONS.map((m, i) => [`${i + 1}. ${m.name}`, i])))
+      .onChange((i: number) => {
+        this.respawn(false)
+        this.missions.start(i)
+      })
     sim.add(this.physics, 'debugEnabled').name('physics wireframe')
 
     const flight = gui.addFolder('Flight')
@@ -266,7 +301,10 @@ export class Game {
     }, 200)
 
     const tune = flight.addFolder('Tuning (Little Bird)')
-    tune.add(p, 'mass', 600, 1500, 10).name('mass (kg)').onChange(() => this.heli.applyMassProperties())
+    tune
+      .add(this.heli, 'emptyMass', 600, 1500, 10)
+      .name('empty mass (kg)')
+      .onChange(() => this.heli.setPayload(this.missions.squad.aboard * TROOP_MASS))
     tune.add(p.rotor, 'maxThrust', 8000, 30000, 100).name('max thrust (N)')
     tune.add(p.rotor, 'climbLoss', 0, 0.1, 0.005).name('climb inflow loss')
     tune.add(p.rotor, 'etlGain', 0, 0.4, 0.01).name('ETL gain')
@@ -362,6 +400,7 @@ export class Game {
         this.camera.fov = gfx.fov
         this.camera.updateProjectionMatrix()
         this.world.updateFrustums()
+        this.missions.setViewport(this.host.clientHeight, gfx.fov)
       })
       .onFinishChange(saveSettings)
     render

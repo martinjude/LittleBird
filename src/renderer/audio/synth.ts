@@ -175,3 +175,19 @@ function normalize(x: Float32Array, target = 0.9): Float32Array {
   for (let i = 0; i < x.length; i++) x[i] *= scale
   return x
 }
+
+/** Short UI chime: a sequence of soft sine notes (e.g. objective updates). */
+export function chime(sampleRate: number, notesHz: number[], noteSeconds = 0.12): Float32Array {
+  const noteLen = Math.round(noteSeconds * sampleRate)
+  const tail = Math.round(0.25 * sampleRate)
+  const out = new Float32Array(noteLen * notesHz.length + tail)
+  notesHz.forEach((hz, n) => {
+    for (let i = 0; i < noteLen + tail; i++) {
+      const t = i / sampleRate
+      const env = Math.min(1, t * 200) * Math.exp(-t * 9)
+      const k = n * noteLen + i
+      if (k < out.length) out[k] += env * (Math.sin(TAU * hz * t) + 0.25 * Math.sin(TAU * hz * 2 * t)) * 0.35
+    }
+  })
+  return out
+}

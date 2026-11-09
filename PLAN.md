@@ -293,6 +293,32 @@ A real helicopter's rotor speed barely changes, because it is governed. What you
 - Troops aboard, ammo, damage and torque warnings.
 - Altitude above ground (AGL) and airspeed.
 
+
+**As built (M6):**
+- `missions/missions.ts` has 4 missions, flown in order:
+
+  | # | Mission | Route | Troops | Smoke |
+  |---|---|---|---|---|
+  | 1 | Valley Insertion | FOB → LZ Alpha | 4 | green |
+  | 2 | Ridge Drop | FOB → LZ Bravo | 4 | yellow |
+  | 3 | High Ground | FOB → LZ Charlie | 2 | purple |
+  | 4 | Extraction | LZ Delta → FOB | 4 | red |
+
+  The debug panel can jump straight to any mission.
+- `MissionRunner` is a pure, tested state machine: briefing → pickup → boarding → transit → unloading → RTB → complete, or failed. Boarding and unloading pause whenever you're not settled inside the zone.
+- `LandingMonitor` runs at 120 Hz:
+  - It grades each touchdown by the peak descent rate in the 0.3 s before contact: smooth below 0.6 m/s (100 points), firm below 1.5 (70), hard below 3 (30), very hard above that (0).
+  - It treats these as crashes: 7 m/s or more, contact at an extreme attitude, or rolling over.
+  - "Landed" means skids down and still for 0.8 s.
+- Scoring: the landing grade, +25 for landing within 15 m of an LZ's panels, +50 per troop delivered, and a time bonus against par (the route at 70 kt plus 90 s). Only landings after a flight count.
+- Troops (`troops/`): stand-in soldiers built from primitives, posed in code (idle, run, sit, kneel).
+  - They run to their bench seat, ride along parented to the aircraft, then climb off one at a time and fan out to a rally point.
+  - Each adds 100 kg to the flight model, so 4 troops take the aircraft from 1,000 kg to 1,400 kg.
+  - MH-6 benches are added to the model, 2 seats a side.
+- Smoke (`fx/Smoke.ts`): a single Points draw call. It pops within 2 km of the LZ, drifts with the wind, and rotor downwash flattens it and spreads it outward.
+- HUD: mission panel (objective, troop dots, timer), waypoint marker clamped to the screen edge, toasts with UI chimes, and briefing/debrief/failed cards. Reset (R/Y) restarts the mission.
+- Not done yet: a rigged and animated soldier model, troop collision and pathing around obstacles, radio voice-overs, and a mission-select menu (M8).
+
 **Combat**
 - Weapons use hitscan raycasts, with tracers drawn as instanced quads. Rockets are simulated projectiles with a small dispersion.
 - Enemy AI has the states Idle → Alert → Engage (fire at the helicopter if it's within range and line of sight) → Flee/Die.
@@ -319,7 +345,7 @@ Each milestone ends with something you can play or test.
 | **M3** ✅ | **Little Bird asset** | The first real GLB goes through the pipeline. Rotors spin and the rotor blur disc fades in. The cockpit camera, instruments and skid contacts work. |
 | **M4** ✅ | **Audio v1** | The full helicopter sound rig from §8.2 works, with cockpit/outside mixes, Doppler and the voice pool. |
 | **M5** ✅ | **Terrain & map** | The 4×4 km heightmap terrain is in, with Rapier heightfield collision, instanced vegetation, the base, LZs, sky and shadows. |
-| **M6** | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
+| **M6** ✅ | **Transport loop** | Troops board and unload. The mission state machine runs, and the HUD shows waypoints and smoke. Landing scoring works. **First playable MVP loop.** |
 | **M7** | **Combat** | Miniguns and rockets work with their FX and audio. Enemy AI and the damage model are in. Includes one "insert under fire" mission. |
 | **M8** | **MVP polish** | Menus, rebinding UI, settings persistence, loading screen, performance pass (LODs, culling, KTX2) and an electron-builder package. |
 
